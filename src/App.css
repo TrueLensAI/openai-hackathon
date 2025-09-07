@@ -1,11 +1,9 @@
 @import "tailwindcss/components";
 @import "tailwindcss/utilities";
 
-html, body {
-    font-family: 'Inter', sans-serif !important;
-  }
-
-.font-brand {
-    font-family: 'Archivo Black', sans-serif !important;
+body, html, #root {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
 }
+
   

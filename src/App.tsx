@@ -6,47 +6,45 @@ import LandingPage from './components/pages/LandingPage';
 import InputPage from './components/pages/InputPage';
 
 const App: React.FC = () => {
-    // State management
     const [page, setPage] = useState<'landing' | 'input'>('landing');
-    const [isFadingOut, setIsFadingOut] = useState<boolean>(false);
-    const [isMenuOpen, setIsMenuOpen] = useState<boolean>(false);
-    const [inputValue, setInputValue] = useState<string>('');
-    const [isLoading, setIsLoading] = useState<boolean>(false);
+    const [isFadingOut, setIsFadingOut] = useState(false);
+    const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const [inputValue, setInputValue] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
     const [results, setResults] = useState<ArtResult[]>([]);
-    const [currentTime, setCurrentTime] = useState<string>('');
-    
-    // Refs
+    const [currentTime, setCurrentTime] = useState('');
+
     const searchInputRef = useRef<HTMLInputElement>(null);
     const menuButtonRef = useRef<HTMLDivElement>(null);
     const navBarRef = useRef<HTMLDivElement>(null);
 
-    // --- EFFECTS ---
-
-    // Effect for the real-time clock
+    // --- Clock ---
     useEffect(() => {
         const updateClock = () => {
             const now = new Date();
-            const timeString = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            setCurrentTime(timeString);
+            setCurrentTime(now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
         };
         updateClock();
-        const timerId = setInterval(updateClock, 60000); // Update every minute
+        const timerId = setInterval(updateClock, 60000);
         return () => clearInterval(timerId);
     }, []);
 
-    // Effect for keyboard input on the landing page
+    // --- Landing page typing ---
     useEffect(() => {
+        if (page !== 'landing') return;
+
         const handleKeyDown = (event: KeyboardEvent) => {
-            if (page === 'landing' && !isMenuOpen && event.key.length === 1 && !event.ctrlKey && !event.altKey && !event.metaKey) {
+            if (!isMenuOpen && event.key.length === 1 && !event.ctrlKey && !event.altKey && !event.metaKey) {
                 event.preventDefault();
-                goToInputPage(event.key);
+                goToInputPage(event.key); // first character
             }
         };
+
         document.addEventListener('keydown', handleKeyDown);
         return () => document.removeEventListener('keydown', handleKeyDown);
     }, [page, isMenuOpen]);
 
-    // Effect to handle clicks outside the mobile menu
+    // --- Close menu on outside click ---
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (
@@ -61,8 +59,7 @@ const App: React.FC = () => {
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [isMenuOpen]);
 
-    // --- HANDLERS AND FUNCTIONS ---
-
+    // --- Navigation ---
     const goToInputPage = (startingChar: string = '') => {
         setIsFadingOut(true);
         setTimeout(() => {
@@ -83,7 +80,8 @@ const App: React.FC = () => {
             setIsFadingOut(false);
         }, 500);
     };
-    
+
+    // --- Search ---
     const handleSearch = (event: React.KeyboardEvent<HTMLInputElement>) => {
         if (event.key === 'Enter' && inputValue.trim() !== '') {
             event.preventDefault();
@@ -96,20 +94,17 @@ const App: React.FC = () => {
         setIsLoading(true);
         setTimeout(() => {
             const dummyData: ArtResult[] = [
-                 { title: 'Neon Dreams', artist: 'J. Harrison', match: 94 },
+                { title: 'Neon Dreams', artist: 'J. Harrison', match: 94 },
                 { title: 'Solitude in Blue', artist: 'Maria Petrova', match: 91 },
-                // ... more data
             ];
             setResults(dummyData);
             setIsLoading(false);
         }, 2000);
     };
 
-    // --- RENDER ---
     return (
-        <div style={{ fontFamily: "'Inter', sans-serif" }} className="bg-[#111] text-[#f5f5f4] overflow-x-hidden">
+        <div style={{ fontFamily: "'Inter', sans-serif" }} className="antialiased bg-[#111] text-[#f5f5f4] overflow-x-hidden relative min-h-screen">
             <style>{`
-                /* Keep global styles here or move to index.css */
                 .font-brand { font-family: 'Archivo Black', sans-serif; }
                 .main-container { min-height: 100vh; width: 100vw; }
                 .prompt-container::after { content: '_'; opacity: 1; animation: blink 1s infinite; }
@@ -120,30 +115,40 @@ const App: React.FC = () => {
                 .art-card .overlay { opacity: 0; transition: opacity 0.3s ease-in-out; }
                 .art-card:hover .overlay { opacity: 1; }
             `}</style>
-            
-            <div className="select-none">
-                <NavBar isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} menuRef={navBarRef} />
 
-                {page === 'landing' ? (
-                    <LandingPage
-                        currentTime={currentTime}
-                        onMenuOpen={() => setIsMenuOpen(true)}
-                        menuButtonRef={menuButtonRef}
-                        isFadingOut={isFadingOut}
-                    />
-                ) : (
-                    <InputPage
-                        inputValue={inputValue}
-                        onInputChange={(e) => setInputValue(e.target.value)}
-                        onSearch={handleSearch}
-                        onGoBack={goBackToLanding}
-                        isLoading={isLoading}
-                        results={results}
-                        currentTime={currentTime}
-                        searchInputRef={searchInputRef}
-                        isFadingOut={isFadingOut}
-                    />
-                )}
+            <NavBar isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} menuRef={navBarRef} />
+
+            {/* Landing Page */}
+            <div
+                className={`absolute inset-0 transition-opacity duration-500 ${
+                    page === 'landing' && !isFadingOut ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'
+                }`}
+            >
+                <LandingPage
+                    currentTime={currentTime}
+                    onMenuOpen={() => setIsMenuOpen(true)}
+                    menuButtonRef={menuButtonRef}
+                    isFadingOut={isFadingOut}
+                />
+            </div>
+
+            {/* Input Page */}
+            <div
+                className={`absolute inset-0 transition-opacity duration-500 ${
+                    page === 'input' && !isFadingOut ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'
+                }`}
+            >
+                <InputPage
+                    inputValue={inputValue}
+                    onInputChange={(e) => setInputValue(e.target.value)}
+                    onSearch={handleSearch}
+                    onGoBack={goBackToLanding}
+                    isLoading={isLoading}
+                    results={results}
+                    currentTime={currentTime}
+                    searchInputRef={searchInputRef}
+                    isFadingOut={isFadingOut}
+                />
             </div>
         </div>
     );

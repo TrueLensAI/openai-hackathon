@@ -9,7 +9,7 @@ const HowItWorks: React.FC = () => (
                                     <div className="md:w-1/2">
                                         <div className="text-6xl font-brand mb-4" style={{color: '#333'}}>01</div>
                                         <h3 className="font-bold text-2xl mb-4">DESCRIBE YOUR VISION</h3>
-                                        <p className="text-gray-400 text-lg leading-relaxed">Start by typing what you're looking for. Whether it's a mood, style, or specific subject matter, our AI understands your creative language.</p>
+                                        <p className="font-sans text-gray-400 text-lg leading-relaxed">Start by typing what you're looking for. Whether it's a mood, style, or specific subject matter, our AI understands your creative language.</p>
                                     </div>
                                     <div className="md:w-1/2 bg-stone-900/50 rounded-lg p-8 text-center">
                                         <div className="text-gray-500 text-sm mb-2">EXAMPLE INPUT</div>
