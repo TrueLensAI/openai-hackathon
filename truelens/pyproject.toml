@@ -1,0 +1,28 @@
+[tool.poetry]
+name = "truelens"
+version = "0.1.0"
+description = ""
+authors = ["Your Name <you@example.com>"]
+readme = "README.md"
+packages = [
+    { include = "app" },
+]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+fastapi = "^0.104.1"
+uvicorn = "^0.23.2"
+langchain = "^0.1.0"
+langchain-openai = "^0.1.0"
+langserve = {extras = ["server"], version = ">=0.1.0"}
+requests = "^2.31.0"
+pydantic = "<2"
+langchain_huggingface = "^0.1.0"
+
+
+[tool.poetry.group.dev.dependencies]
+langchain-cli = ">=0.0.15"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

@@ -1,5 +1,6 @@
 export interface ArtResult {
-    title: string;
-    artist: string;
-    match: number;
+  title: string;
+  artist: string;
+  match: number;
+  imageUrl: string;
 }

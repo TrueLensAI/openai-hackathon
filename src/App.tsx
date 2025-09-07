@@ -1,114 +1,181 @@
 // src/App.tsx
-import React, { useState, useEffect, useRef } from 'react';
-import type { ArtResult } from './types';
-import NavBar from './components/ui/NavBar';
-import LandingPage from './components/pages/LandingPage';
-import InputPage from './components/pages/InputPage';
+import React, { useState, useEffect, useRef } from "react";
+import type { ArtResult } from "./types";
+import NavBar from "./components/ui/NavBar";
+import LandingPage from "./components/pages/LandingPage";
+import InputPage from "./components/pages/InputPage";
 
 const App: React.FC = () => {
-    // State management
-    const [page, setPage] = useState<'landing' | 'input'>('landing');
-    const [isFadingOut, setIsFadingOut] = useState<boolean>(false);
-    const [isMenuOpen, setIsMenuOpen] = useState<boolean>(false);
-    const [inputValue, setInputValue] = useState<string>('');
-    const [isLoading, setIsLoading] = useState<boolean>(false);
-    const [results, setResults] = useState<ArtResult[]>([]);
-    const [currentTime, setCurrentTime] = useState<string>('');
-    
-    // Refs
-    const searchInputRef = useRef<HTMLInputElement>(null);
-    const menuButtonRef = useRef<HTMLDivElement>(null);
-    const navBarRef = useRef<HTMLDivElement>(null);
+  // State management
+  const [page, setPage] = useState<"landing" | "input">("landing");
+  const [isFadingOut, setIsFadingOut] = useState<boolean>(false);
+  const [isMenuOpen, setIsMenuOpen] = useState<boolean>(false);
+  const [inputValue, setInputValue] = useState<string>("");
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [results, setResults] = useState<ArtResult[]>([]);
+  const [responseText, setResponseText] = useState<string>("");
+  const [currentTime, setCurrentTime] = useState<string>("");
 
-    // --- EFFECTS ---
+  // Refs
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const menuButtonRef = useRef<HTMLDivElement>(null);
+  const navBarRef = useRef<HTMLDivElement>(null);
 
-    // Effect for the real-time clock
-    useEffect(() => {
-        const updateClock = () => {
-            const now = new Date();
-            const timeString = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            setCurrentTime(timeString);
-        };
-        updateClock();
-        const timerId = setInterval(updateClock, 60000); // Update every minute
-        return () => clearInterval(timerId);
-    }, []);
+  // --- EFFECTS ---
 
-    // Effect for keyboard input on the landing page
-    useEffect(() => {
-        const handleKeyDown = (event: KeyboardEvent) => {
-            if (page === 'landing' && !isMenuOpen && event.key.length === 1 && !event.ctrlKey && !event.altKey && !event.metaKey) {
-                event.preventDefault();
-                goToInputPage(event.key);
-            }
-        };
-        document.addEventListener('keydown', handleKeyDown);
-        return () => document.removeEventListener('keydown', handleKeyDown);
-    }, [page, isMenuOpen]);
-
-    // Effect to handle clicks outside the mobile menu
-    useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            if (
-                isMenuOpen &&
-                navBarRef.current && !navBarRef.current.contains(event.target as Node) &&
-                menuButtonRef.current && !menuButtonRef.current.contains(event.target as Node)
-            ) {
-                setIsMenuOpen(false);
-            }
-        };
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, [isMenuOpen]);
-
-    // --- HANDLERS AND FUNCTIONS ---
-
-    const goToInputPage = (startingChar: string = '') => {
-        setIsFadingOut(true);
-        setTimeout(() => {
-            setPage('input');
-            setInputValue(startingChar);
-            setIsFadingOut(false);
-            setTimeout(() => searchInputRef.current?.focus(), 0);
-        }, 500);
+  // Effect for the real-time clock
+  useEffect(() => {
+    const updateClock = () => {
+      const now = new Date();
+      const timeString = now.toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+      setCurrentTime(timeString);
     };
+    updateClock();
+    const timerId = setInterval(updateClock, 60000); // Update every minute
+    return () => clearInterval(timerId);
+  }, []);
 
-    const goBackToLanding = () => {
-        setIsFadingOut(true);
-        setTimeout(() => {
-            setPage('landing');
-            setInputValue('');
-            setResults([]);
-            setIsLoading(false);
-            setIsFadingOut(false);
-        }, 500);
+  // Effect for keyboard input on the landing page
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (
+        page === "landing" &&
+        !isMenuOpen &&
+        event.key.length === 1 &&
+        !event.ctrlKey &&
+        !event.altKey &&
+        !event.metaKey
+      ) {
+        event.preventDefault();
+        goToInputPage(event.key);
+      }
     };
-    
-    const handleSearch = (event: React.KeyboardEvent<HTMLInputElement>) => {
-        if (event.key === 'Enter' && inputValue.trim() !== '') {
-            event.preventDefault();
-            fetchResults();
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [page, isMenuOpen]);
+
+  // Effect to handle clicks outside the mobile menu
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        isMenuOpen &&
+        navBarRef.current &&
+        !navBarRef.current.contains(event.target as Node) &&
+        menuButtonRef.current &&
+        !menuButtonRef.current.contains(event.target as Node)
+      ) {
+        setIsMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [isMenuOpen]);
+
+  // --- HANDLERS AND FUNCTIONS ---
+
+  const goToInputPage = (startingChar: string = "") => {
+    setIsFadingOut(true);
+    setTimeout(() => {
+      setPage("input");
+      setInputValue(startingChar);
+      setIsFadingOut(false);
+      setTimeout(() => searchInputRef.current?.focus(), 0);
+    }, 500);
+  };
+
+  const goBackToLanding = () => {
+    setIsFadingOut(true);
+    setTimeout(() => {
+      setPage("landing");
+      setInputValue("");
+      setResults([]);
+      setResponseText("");
+      setIsLoading(false);
+      setIsFadingOut(false);
+    }, 500);
+  };
+
+  const handleSearch = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Enter" && inputValue.trim() !== "") {
+      event.preventDefault();
+      fetchResults();
+    }
+  };
+
+  const fetchResults = async () => {
+    setResults([]);
+    setResponseText("");
+    setIsLoading(true);
+    let finalOutput = ""; // To store the final answer
+
+    try {
+      const response = await fetch("/api/stream_events", {
+        // Or /astream_events
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ input: { input: inputValue } }),
+      });
+      let buffer = "";
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+
+      if (!reader) return;
+
+      // 3. Read the stream in a loop
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break; // Exit loop when stream is finished
+        if (value) {
+          const chunk = decoder.decode(value, { stream: true });
+          console.log("Received chunk:", chunk);
+          buffer += chunk;
+          console.log("Current buffer:", buffer);
+
+          // Process complete lines
+          const lines = buffer.split("\n");
+          buffer = lines.pop() || ""; // Keep incomplete line in buffer
+
+          for (const line of lines) {
+            if (line.startsWith("data: ")) {
+              try {
+                const jsonStr = line.slice(6); // Remove 'data: '
+                const data = JSON.parse(jsonStr);
+                console.log("Parsed data:", data);
+                if (data.event === "on_parser_end") {
+                  const output = data.data.output.return_values.output;
+                  finalOutput = output;
+                  setResponseText(output);
+                }
+              } catch (parseError) {
+                console.error("Error parsing JSON:", parseError, "Line:", line);
+              }
+            }
+          }
         }
-    };
+      }
 
-    const fetchResults = () => {
-        setResults([]);
-        setIsLoading(true);
-        setTimeout(() => {
-            const dummyData: ArtResult[] = [
-                 { title: 'Neon Dreams', artist: 'J. Harrison', match: 94 },
-                { title: 'Solitude in Blue', artist: 'Maria Petrova', match: 91 },
-                // ... more data
-            ];
-            setResults(dummyData);
-            setIsLoading(false);
-        }, 2000);
-    };
+      // Set the final answer at the very end if not already set
+      if (finalOutput) {
+        setResponseText(finalOutput);
+      }
+    } catch (error) {
+      console.error("Error fetching results:", error);
+      setResponseText("An error occurred. Please check the console.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-    // --- RENDER ---
-    return (
-        <div style={{ fontFamily: "'Inter', sans-serif" }} className="bg-[#111] text-[#f5f5f4] overflow-x-hidden">
-            <style>{`
+  // --- RENDER ---
+  return (
+    <div
+      style={{ fontFamily: "'Inter', sans-serif" }}
+      className="bg-[#111] text-[#f5f5f4] overflow-x-hidden"
+    >
+      <style>{`
                 /* Keep global styles here or move to index.css */
                 .font-brand { font-family: 'Archivo Black', sans-serif; }
                 .main-container { min-height: 100vh; width: 100vw; }
@@ -120,33 +187,38 @@ const App: React.FC = () => {
                 .art-card .overlay { opacity: 0; transition: opacity 0.3s ease-in-out; }
                 .art-card:hover .overlay { opacity: 1; }
             `}</style>
-            
-            <div className="select-none">
-                <NavBar isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} menuRef={navBarRef} />
 
-                {page === 'landing' ? (
-                    <LandingPage
-                        currentTime={currentTime}
-                        onMenuOpen={() => setIsMenuOpen(true)}
-                        menuButtonRef={menuButtonRef}
-                        isFadingOut={isFadingOut}
-                    />
-                ) : (
-                    <InputPage
-                        inputValue={inputValue}
-                        onInputChange={(e) => setInputValue(e.target.value)}
-                        onSearch={handleSearch}
-                        onGoBack={goBackToLanding}
-                        isLoading={isLoading}
-                        results={results}
-                        currentTime={currentTime}
-                        searchInputRef={searchInputRef}
-                        isFadingOut={isFadingOut}
-                    />
-                )}
-            </div>
-        </div>
-    );
+      <div className="select-none">
+        <NavBar
+          isOpen={isMenuOpen}
+          onClose={() => setIsMenuOpen(false)}
+          menuRef={navBarRef}
+        />
+
+        {page === "landing" ? (
+          <LandingPage
+            currentTime={currentTime}
+            onMenuOpen={() => setIsMenuOpen(true)}
+            menuButtonRef={menuButtonRef}
+            isFadingOut={isFadingOut}
+          />
+        ) : (
+          <InputPage
+            inputValue={inputValue}
+            onInputChange={(e) => setInputValue(e.target.value)}
+            onSearch={handleSearch}
+            onGoBack={goBackToLanding}
+            isLoading={isLoading}
+            results={results}
+            responseText={responseText}
+            currentTime={currentTime}
+            searchInputRef={searchInputRef}
+            isFadingOut={isFadingOut}
+          />
+        )}
+      </div>
+    </div>
+  );
 };
 
 export default App;
