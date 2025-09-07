@@ -129,6 +129,7 @@ const App: React.FC = () => {
                     onMenuOpen={() => setIsMenuOpen(true)}
                     menuButtonRef={menuButtonRef}
                     isFadingOut={isFadingOut}
+                    goToInputPage={goToInputPage} // new
                 />
             </div>
 
