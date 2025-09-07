@@ -10,7 +10,7 @@ const Footer: React.FC<FooterProps> = ({ currentTime, showSocials = false }) => 
         {showSocials && (
             <div>
                 <span className="font-bold">SOCIALS:</span>
-                <span>@CURATE_AI</span>
+                <span>@TRUE_LENS</span>
             </div>
         )}
         <div className="font-mono text-right">{currentTime}</div>
