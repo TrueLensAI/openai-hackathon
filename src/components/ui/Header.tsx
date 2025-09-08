@@ -7,9 +7,9 @@ interface HeaderProps {
 
 const Header: React.FC<HeaderProps> = ({ onMenuOpen, menuButtonRef }) => (
     <header className="w-full flex justify-between items-center z-10">
-        <div className="w-10 h-10">
-            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
-                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14.59L7.41 13 9 11.41l2 2 4-4L16.59 11 11 16.59z" fill="#f5f5f4" />
+        <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center">
+            <svg xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 512 512" className="w-5 h-5">
+                <path fill="#111" d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376C296.3 401.1 253.9 416 208 416 93.1 416 0 322.9 0 208S93.1 0 208 0 416 93.1 416 208zM208 352a144 144 0 1 0 0-288 144 144 0 1 0 0 288z"/>
             </svg>
         </div>
         <div ref={menuButtonRef} onClick={onMenuOpen} className="w-10 h-10 bg-stone-800/50 rounded-full flex items-center justify-center cursor-pointer">
