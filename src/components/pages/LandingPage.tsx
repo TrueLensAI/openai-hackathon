@@ -12,6 +12,7 @@ interface LandingPageProps {
     menuButtonRef: React.RefObject<HTMLDivElement | null>;
     isFadingOut: boolean;
     goToInputPage: (startingChar?: string) => void;
+    goToEthos: () => void;
 }
 
 const LandingPage: React.FC<LandingPageProps> = ({
@@ -19,7 +20,8 @@ const LandingPage: React.FC<LandingPageProps> = ({
     onMenuOpen,
     menuButtonRef,
     isFadingOut,
-    goToInputPage
+    goToInputPage,
+    goToEthos
 }) => (
     <>
         <div className={`main-container flex flex-col p-4 sm:p-6 md:p-8 relative transition-opacity duration-500 ${isFadingOut ? 'opacity-0' : 'opacity-100'}`}>
@@ -30,11 +32,11 @@ const LandingPage: React.FC<LandingPageProps> = ({
                 </h1>
             </main>
             <div className="hidden md:block absolute top-1/2 -translate-y-1/2 left-8 lg:left-16 z-10 max-w-[200px]">
-                <p className="font-bold text-lg leading-tight">THE AI CURATOR THAT HELPS YOU DISCOVER A THING OR TWO.</p>
-                <p className="mt-4 text-lg leading-tight">STARTING WITH YOUR TASTE.</p>
+                <p className="font-bold text-lg leading-tight">AI THAT CURATES HUMANITY.</p>
+                <p className="mt-4 text-lg leading-tight">IT STARTS WITH YOUR EYE.</p>
             </div>
             <div className="hidden md:block absolute top-1/2 -translate-y-1/2 right-8 lg:right-16 z-10 max-w-[200px] text-right">
-                <p className="font-bold text-lg leading-tight">FIND THE BEST HUMAN-MADE ART FOR YOU.</p>
+                <p className="font-bold text-lg leading-tight">SEE THE ART THAT SPEAKS TO YOU.</p>
             </div>
             {/* Clickable "START TYPING" with hover effect */}
             <div
@@ -47,7 +49,7 @@ const LandingPage: React.FC<LandingPageProps> = ({
         </div>
         <Features />
         <HowItWorks />
-        <Gallery />
+        <Gallery onNavigateToEthos={goToEthos} isVisible={!isFadingOut} />
     </>
 );
 
