@@ -1,55 +1,38 @@
 #!/usr/bin/env python
-"""Example LangChain server exposes a conversational retrieval agent.
-
-Relevant LangChain documentation:
-
-* Creating a custom agent: https://python.langchain.com/docs/modules/agents/how_to/custom_agent
-* Streaming with agents: https://python.langchain.com/docs/modules/agents/how_to/streaming#custom-streaming-with-events
-* General streaming documentation: https://python.langchain.com/docs/expression_language/streaming
-
-**ATTENTION**
-1. To support streaming individual tokens you will need to use the astream events
-   endpoint rather than the streaming endpoint.
-2. This example does not truncate message history, so it will crash if you
-   send too many messages (exceed token length).
-3. The playground at the moment does not render agent output well! If you want to
-   use the playground you need to customize it's output server side using astream
-   events by wrapping it within another runnable.
-4. See the client notebook it has an example of how to use stream_events client side!
-"""
-from typing import Any, Optional
+from typing import Any, List
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from langchain.agents import AgentExecutor, create_openai_functions_agent
 from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain.tools import tool
+from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.runnables import RunnableLambda
 from langchain_fireworks import ChatFireworks
 from langchain_exa import ExaSearchResults
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from dotenv import load_dotenv
-import requests
 import os
 
 from langserve import add_routes
-# To set up the required Python packages, run the following command in your terminal:
-# pip install langchain langchain-openai langserve fastapi uvicorn requests pydantic
+
 load_dotenv()
 os.environ["FIREWORKS_API_KEY"] = os.getenv('FIREWORKS_API_KEY')
 EXA_API = os.getenv("EXA_API_KEY")
+
 # --- Tool Definitions ---
 
 exa_search = ExaSearchResults(
     exa_api_key=EXA_API,
-    num_results=20)
+    num_results=20
+)
 
 @tool
 def find_image_urls(query: str) -> list[str]:
     """Searches for a query and returns a list of the most relevant URLs."""
-    # Invoke the Exa search tool with the given query.
     results = exa_search.invoke({"query": query})
-    # Process the results to extract just the URL from each search hit.
     return [res["url"] for res in results]
+
 tools = [find_image_urls]
 
 # --- Prompt and Agent Chain ---
@@ -68,13 +51,14 @@ prompt = ChatPromptTemplate.from_messages(
             "Once you have gathered all three pieces of information, and only then, you must call the 'find_image_urls' tool with a query that combines the style, purpose, and description. "
             "Your final answer must be the list of URLs returned by the tool."
         ),
+        MessagesPlaceholder(variable_name="chat_history"),
         ("user", "{input}"),
         MessagesPlaceholder(variable_name="agent_scratchpad"),
     ]
 )
+
 llm = ChatFireworks(
     model="accounts/fireworks/models/gpt-oss-120b",
-
 )
 
 agent = create_openai_functions_agent(llm, tools, prompt)
@@ -87,29 +71,53 @@ app = FastAPI(
     version="1.0",
     description="An API server that uses LangChain to find images with a tool.",
 )
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"], # The origin of your frontend app
+    allow_origins=["http://localhost:5173"],
     allow_credentials=True,
-    allow_methods=["*"], # Allows all methods (GET, POST, etc.)
-    allow_headers=["*"], # Allows all headers
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
+
+# Define a Pydantic model for a single chat message
+class ChatMessage(BaseModel):
+    role: str
+    content: str
+
+# Update the Input model to use the new ChatMessage model
 class Input(BaseModel):
     input: str
-
+    chat_history: List[ChatMessage] = []
 
 class Output(BaseModel):
     output: Any
 
+def convert_messages(input_data: Input):
+    """Converts our custom ChatMessage objects into LangChain's message objects."""
+    messages = []
+    for msg in input_data.chat_history:
+        if msg.role.lower() == 'human':
+            messages.append(HumanMessage(content=msg.content))
+        elif msg.role.lower() == 'ai' or msg.role.lower() == 'assistant':
+            messages.append(AIMessage(content=msg.content))
+    
+    return {
+        "input": input_data.input,
+        "chat_history": messages,
+    }
+
+# Combine the conversion step with the agent executor
+final_chain = RunnableLambda(convert_messages) | agent_executor
+
 add_routes(
     app,
-    agent_executor.with_types(input_type=Input, output_type=Output).with_config(
+    final_chain.with_types(input_type=Input, output_type=Output).with_config(
         {"run_name": "agent"}
     ),
+    path="/invoke",
 )
 
 if __name__ == "__main__":
     import uvicorn
-
     uvicorn.run(app, host="localhost", port=8000)
-
