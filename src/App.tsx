@@ -113,7 +113,6 @@ const App: React.FC = () => {
 
     try {
       const response = await fetch("/api/stream_events", {
-        // Or /astream_events
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ input: { input: inputValue } }),
@@ -124,26 +123,21 @@ const App: React.FC = () => {
 
       if (!reader) return;
 
-      // 3. Read the stream in a loop
       while (true) {
         const { value, done } = await reader.read();
-        if (done) break; // Exit loop when stream is finished
+        if (done) break;
         if (value) {
           const chunk = decoder.decode(value, { stream: true });
-          console.log("Received chunk:", chunk);
           buffer += chunk;
-          console.log("Current buffer:", buffer);
 
-          // Process complete lines
           const lines = buffer.split("\n");
-          buffer = lines.pop() || ""; // Keep incomplete line in buffer
+          buffer = lines.pop() || "";
 
           for (const line of lines) {
             if (line.startsWith("data: ")) {
               try {
-                const jsonStr = line.slice(6); // Remove 'data: '
+                const jsonStr = line.slice(6);
                 const data = JSON.parse(jsonStr);
-                console.log("Parsed data:", data);
                 if (data.event === "on_parser_end") {
                   const output = data.data.output.return_values.output;
                   finalOutput = output;
@@ -157,7 +151,6 @@ const App: React.FC = () => {
         }
       }
 
-      // Set the final answer at the very end if not already set
       if (finalOutput) {
         setResponseText(finalOutput);
       }
@@ -176,7 +169,7 @@ const App: React.FC = () => {
       className="bg-[#111] text-[#f5f5f4] overflow-x-hidden"
     >
       <style>{`
-                /* Keep global styles here or move to index.css */
+                /* Global styles */
                 .font-brand { font-family: 'Archivo Black', sans-serif; }
                 .main-container { min-height: 100vh; width: 100vw; }
                 .prompt-container::after { content: '_'; opacity: 1; animation: blink 1s infinite; }
@@ -186,6 +179,24 @@ const App: React.FC = () => {
                 html { scroll-behavior: smooth; }
                 .art-card .overlay { opacity: 0; transition: opacity 0.3s ease-in-out; }
                 .art-card:hover .overlay { opacity: 1; }
+
+                /* --- THIS IS THE FIX --- */
+                @keyframes fade-in-up {
+                    from {
+                        opacity: 0;
+                        transform: translateY(20px);
+                    }
+                    to {
+                        opacity: 1;
+                        transform: translateY(0);
+                    }
+                }
+
+                .animate-fade-in-up {
+                    animation: fade-in-up 0.8s ease-out forwards;
+                }
+                /* --- END OF FIX --- */
+
             `}</style>
 
       <div className="select-none">
@@ -201,6 +212,7 @@ const App: React.FC = () => {
             onMenuOpen={() => setIsMenuOpen(true)}
             menuButtonRef={menuButtonRef}
             isFadingOut={isFadingOut}
+            goToInputPage={goToInputPage}
           />
         ) : (
           <InputPage
