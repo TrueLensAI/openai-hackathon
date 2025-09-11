@@ -153,8 +153,8 @@ const InputPage: React.FC<InputPageProps> = ({
             </div>
           )}
           {/* Messages */}
-<div className="w-full mt-8 sm:mt-12 flex flex-col gap-4">
-  {messages.map((m, idx) => {
+<div className="w-full mt-8 sm:mt-12 flex flex-col-reverse gap-4">
+  {messages.reverse().map((m, idx) => {
     if (m.type === "assistant" && m.content) {
       return (
         <div

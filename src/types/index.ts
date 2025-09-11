@@ -27,3 +27,5 @@ export interface Image {
   page_url: string;
   purchase_steps?: string[];
 }
+
+
