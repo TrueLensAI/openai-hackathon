@@ -347,10 +347,7 @@ class TrueLensSearchImageTool(BaseTool):
     supported_marketplaces: List[str] = []
     def __init__(self):
         super().__init__()
-        self.supported_marketplaces = [
-            "etsy.com", "artfinder.com", "saatchiart.com", "1stdibs.com",
-            "artsy.net", "invaluable.com", "artnet.com"
-        ]
+        self.supported_marketplaces = ["https://www.shutterstock.com", "https://stock.adobe.com", "https://www.gettyimages.com", "https://www.istockphoto.com", "https://depositphotos.com", "https://pixabay.com", "https://unsplash.com", "https://www.pexels.com", "https://www.freepik.com", "https://www.vecteezy.com", "https://creativemarket.com", "https://www.etsy.com", "https://www.deviantart.com", "https://www.artstation.com", "https://www.behance.net", "https://dribbble.com", "https://www.iconfinder.com", "https://thenounproject.com", "https://icons8.com", "https://www.flaticon.com", "https://www.stockvault.net", "https://burst.shopify.com", "https://stocksnap.io", "https://picjumbo.com", "https://500px.com", "https://www.flickr.com", "https://www.artsy.net", "https://www.saatchiart.com", "https://fineartamerica.com", "https://society6.com"]
 
     
     async def search_exa_ai_enhanced(self, query) -> List[Dict]:
