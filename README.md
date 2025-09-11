@@ -30,7 +30,8 @@
 
   #### In a seperate terminal window run `main.py` or click the run button with VS Code
 
-#### Visit https://localhost:5173 and start typing!
+#### Make sure your .env variables are saved before visiting https://localhost:5173 or the live version https://openai-hackathon-eta.vercel.app/.
+#### And then start typing!
 
 ## Value proposition
 TrueLens aims to prove advances within the AI space don't inherently come at the cost of human creativity and skills. As fear of replacement continues lingers within fields of Creative Arts, Music, and Computer Science, TrueLens provides a solution that expands access to one of the most impacted industries.
