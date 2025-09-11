@@ -2,9 +2,13 @@
 
 An AI-powered curation tool that helps you find real human-made art based on your feelings.
 
+
+_Landing Page_
 <img width="1430" height="697" alt="Screen Shot 2025-09-11 at 1 55 03 AM" src="https://github.com/user-attachments/assets/34467b60-a545-43b0-bca9-12be2b84f0ea" />
 <img width="1420" height="671" alt="Screen Shot 2025-09-11 at 1 55 18 AM" src="https://github.com/user-attachments/assets/13a0128f-b744-4d7a-ae7a-ff40e286f198" />
 
+
+_Input Page_
 <img width="1423" height="644" alt="Screen Shot 2025-09-11 at 1 58 12 AM" src="https://github.com/user-attachments/assets/b397ccd7-e352-4d61-a82f-16bc3f2a1284" />
 
 
