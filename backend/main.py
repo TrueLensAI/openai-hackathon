@@ -53,7 +53,7 @@ class Config:
     HUGGINGFACE_API_KEY = os.getenv("HUGGINGFACE_API_KEY", "hf_placeholder_api_key")
     # GPT-OSS-20B endpoint and model
     HUGGINGFACE_ENDPOINT = os.getenv("HUGGINGFACE_ENDPOINT",
-        "https://router.huggingface.co/v1")
+        "https://router.huggingface.co/v1/chat/completions")
     HUGGINGFACE_MODEL = os.getenv("HUGGINGFACE_MODEL", "openai/gpt-oss-20b:fireworks-ai")
     
     EXA_AI_API_KEY = os.getenv("EXA_AI_API_KEY", "exa_placeholder_api_key")

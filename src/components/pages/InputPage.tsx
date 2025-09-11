@@ -1,9 +1,8 @@
 import React, { useEffect } from "react";
 import type { ArtResult, Message } from "../../types";
 import Footer from "../ui/Footer";
-import ArtCard from "../ui/ArtCard";
 import LoaderIcon from "../ui/LoaderIcon";
-import ImageResults from "../imageResults";
+import ImageResults from "../ImageResults";
 
 interface InputPageProps {
   inputValue: string;
@@ -153,6 +152,23 @@ const InputPage: React.FC<InputPageProps> = ({
               <LoaderIcon />
             </div>
           )}
+          {/* Messages */}
+<div className="w-full mt-8 sm:mt-12 flex flex-col gap-4">
+  {messages.map((m, idx) => {
+    if (m.type === "assistant" && m.content) {
+      return (
+        <div
+          key={idx}
+          className="bg-stone-800/50 text-stone-100 p-4 rounded-lg max-w-3xl mx-auto animate-fade-in-up"
+        >
+          {m.content}
+        </div>
+      );
+    }
+    return null;
+  })}
+</div>
+
 
           {/* Image Results */}
           {latestAssistantMessage && latestAssistantMessage.images && (
