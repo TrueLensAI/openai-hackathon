@@ -1,5 +1,5 @@
 import React, { useEffect } from "react";
-import type { ArtResult, Message } from "../../types";
+import type { Message } from "../../types";
 import Footer from "../ui/Footer";
 import LoaderIcon from "../ui/LoaderIcon";
 import ImageResults from "../ImageResults";

@@ -83,19 +83,6 @@ const ImageResults = ({ images }: { images: Image[] | null }) => {
     return null;
   }
 
-  const getConfidenceColor = (confidence: string) => {
-    switch (confidence) {
-      case "high":
-        return "bg-green-900/50 text-green-300";
-      case "medium":
-        return "bg-yellow-900/50 text-yellow-300";
-      case "low":
-        return "bg-stone-700 text-stone-300";
-      default:
-        return "bg-blue-900/50 text-blue-300";
-    }
-  };
-
   const getConfidenceEmoji = (confidence: string) => {
     switch (confidence) {
       case "high":
@@ -134,9 +121,7 @@ const ImageResults = ({ images }: { images: Image[] | null }) => {
             </div>
             {/* Confidence Badge */}
             <div
-              className={`absolute top-3 left-3 px-2 py-1 rounded-full text-xs font-medium ${getConfidenceColor(
-                image.metadata?.confidence || "match"
-              )}`}
+              className={`absolute top-3 left-3 px-2 py-1 rounded-full text-xs font-medium bg-stone-900/50`}
             >
               {getConfidenceEmoji(image.metadata?.confidence || "match")}{" "}
               {image.metadata?.confidence || "match"}
@@ -173,7 +158,7 @@ const ImageResults = ({ images }: { images: Image[] | null }) => {
                 href={image.page_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex-1 bg-blue-700 hover:bg-blue-800 text-stone-100 px-4 py-2 rounded-lg text-sm font-medium flex items-center justify-center transition-colors"
+                className="flex-1 bg-stone-800/50  hover:bg-black  text-stone-100 px-4 py-2 rounded-lg text-sm font-medium flex items-center justify-center transition-colors"
               >
                 <ExternalLink className="w-4 h-4 mr-2" />
                 View
@@ -182,7 +167,7 @@ const ImageResults = ({ images }: { images: Image[] | null }) => {
                 href={image.page_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex-1 bg-green-700 hover:bg-green-800 text-stone-100 px-4 py-2 rounded-lg text-sm font-medium flex items-center justify-center transition-colors"
+                className="flex-1 bg-stone-800/50  hover:bg-black text-stone-100 px-4 py-2 rounded-lg text-sm font-medium flex items-center justify-center transition-colors"
               >
                 <ShoppingCart className="w-4 h-4 mr-2" />
                 Buy Now

@@ -22,7 +22,10 @@ import uuid
 from langchain.llms.base import LLM
 from langchain.callbacks.manager import CallbackManagerForLLMRun
 from langchain.tools import BaseTool
-from langchain.agents import initialize_agent, AgentType
+from langchain.agents import initialize_agent, AgentType, AgentExecutor
+from langchain.agents.format_scratchpad import format_log_to_str
+from langchain.agents.output_parsers import ReActSingleInputOutputParser
+from langchain.tools.render import render_text_description
 from langchain.memory import ConversationBufferWindowMemory
 from langchain.schema import BaseMessage, HumanMessage, AIMessage
 from langchain.prompts import PromptTemplate
@@ -46,7 +49,7 @@ class Config:
         "http://localhost:5173",  # Vite dev server
         "http://localhost:3000",  # Alternative React port
         "http://localhost:4173",  # Vite preview
-        "https://truelensai-hackathon.vercel.app",  # Production deployment
+        "openai-hackathon-eta.vercel.app",  # Production deployment
         "https://*.vercel.app",  # Vercel deployments
     ]
     
@@ -729,59 +732,81 @@ class TrueLensSearchImageTool(BaseTool):
 # =============================================
 
 TRUELENS_SYSTEM_PROMPT = f""""
-You are a professional Art Search Assistant named TrueLens. Your primary function is to facilitate image searches for users. Your process is iterative and conversational.
+You are TrueLens, a professional Art Search Assistant. You help users find artwork by using the Search_Image tool.
 
-Core Directives:
+CRITICAL: You MUST follow this exact format for ALL responses:
 
-Requirement Verification: You must verify that the user's request contains the following two essential components:
-
-General Image Description: A detailed description of the subject, scene, or objects within the desired image.
-
-General Image Style: The artistic style of the image (e.g., Cartoon, Realistic, Abstract, Minimalist, Watercolor, Oil Painting, etc.).
-
-Iterative Understanding: You will build upon and refine your understanding of the user's request with each new response they provide. If a user provides new information that fills in a missing component, you will update your internal state accordingly.
-
-Completion and Action:
-
-Once the user has provided a clear General Image Description and General Image Style, you are to process their query.
-
-Format the complete query into a single, optimized string for a neural vector search that will be used as input for Exa AI search.
-
-Once the optimized query is formatted, you MUST call the TrueLensSearchImageTool with the optimized query string as the input parameter.
-
-IMPORTANT: When calling the tool, use this exact format:
+Thought: [Your reasoning about what to do next]
 Action: Search_Image
-Action Input: "your optimized query string here"
+Action Input: [Your search query as a simple string]
 
-Handling Missing Information:
+OR
 
-If the user's request is missing the General Image Description or the General Image Style, provide a concise, one-line suggestion to guide the user. The suggestion should highlight the missing element.
+Thought: [Your reasoning]
+Final Answer: [Your final response to the user]
 
-Example suggestions:
+NEVER mix Action and Final Answer in the same response.
+NEVER provide a Final Answer when you intend to use a tool.
 
-If missing the description: "Please provide a more detailed description of the image you have in mind."
+TOOL USAGE RULES:
+1. If you need to search for images, use EXACTLY this format:
+   Action: Search_Image
+   Action Input: [search query string]
 
-If missing the style: "Could you please specify the art style you are looking for (e.g., cartoon, realistic, oil painting)?"
+2. The Action Input should be a simple string like "realistic mountain landscape painting"
+
+3. After the tool runs and you receive results, provide your Final Answer in the next response.
+
+4. Do NOT try to format the final answer as JSON - just provide a natural language response.
+
+RESPONSE FORMAT:
+- Start with "Thought:" to explain your reasoning
+- If using a tool: End with "Action:" and "Action Input:"
+- If providing final answer: End with "Final Answer:"
+- NEVER include both Action and Final Answer in one response
+
+EXAMPLE CORRECT FORMAT:
+Thought: The user wants a realistic painting of mountains. I have all the information needed.
+Action: Search_Image
+Action Input: realistic mountain landscape painting
+
+EXAMPLE FINAL ANSWER FORMAT:
+Thought: I have received the search results and should present them to the user.
+Final Answer: I found several beautiful mountain landscape paintings for you...
+
+MISSING INFORMATION:
+If the request lacks description or style, ask for clarification:
+Thought: The user didn't specify the style for their cat image.
+Final Answer: What style are you looking for? Realistic, cartoon, abstract, or something else?
 """
 
 # Initialize LLM and tools for TrueLensAI
 def create_truelens_agent(user_id: str):
-    """Create a TrueLensAI-specific agent instance"""
+    """Create a TrueLensAI-specific agent instance with simplified logic"""
     llm = TrueLensGPTOSS()
     tools = [TrueLensSearchImageTool()]
     memory = session_manager.get_or_create_memory(user_id)
 
+    # Use a simpler, more reliable agent configuration
     agent = initialize_agent(
         tools=tools,
         llm=llm,
         agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
         memory=memory,
         verbose=True,
-        max_iterations=3,
+        max_iterations=1,  # Single iteration to prevent complex chains
         early_stopping_method="generate",
         handle_parsing_errors=True,
         agent_kwargs={
-            "system_message": TRUELENS_SYSTEM_PROMPT
+            "system_message": TRUELENS_SYSTEM_PROMPT,
+            "format_instructions": """Use the following format:
+
+Thought: Think about what to do next
+Action: the action to take (Search_Image)
+Action Input: the input to the action (search query string)
+Observation: the result of the action
+Thought: I now know the final answer
+Final Answer: the final answer to the user"""
         }
     )
 
@@ -1007,106 +1032,37 @@ async def truelens_chat(message: ChatMessage, background_tasks: BackgroundTasks)
             # Log the incoming message
             logger.info(f"Processing message: {message.message}")
 
-            # Use the agent to process the message - this allows the model to format optimized query and call tool
-            agent_response = await asyncio.get_event_loop().run_in_executor(
-                None, agent.run, message.message
-            )
-
-            logger.info(f"Agent response: {agent_response[:200]}...")
-
-            # Extract requirements from user message for fallback handling
+            # Extract requirements from user message for analysis
             requirements = extract_requirements_ai(message.message)
-
-            # Check if we have all requirements and agent didn't successfully call tool
             has_all_requirements = all([
                 requirements.get('description'),
                 requirements.get('style')
             ])
 
-            # If we have requirements but agent failed to call tool properly, do it manually
-            if has_all_requirements and not ('"status": "success"' in agent_response or agent_response.startswith('{"status":')):
-                logger.info("Agent failed to call tool, falling back to manual tool call")
+            # Direct approach: If we have all requirements, execute search directly
+            if has_all_requirements:
+                logger.info("Direct execution: Have all requirements, executing search")
 
                 # Format optimized query
                 optimized_query = f"{requirements['style']} {requirements['description']}".strip()
+                logger.info(f"Executing search with query: {optimized_query}")
 
-                # Call the tool directly
+                # Execute the tool directly
                 tool_response = await TrueLensSearchImageTool()._arun(optimized_query)
 
                 # Calculate processing time
                 processing_time = (datetime.now() - start_time).total_seconds()
 
-                # Format the tool response
+                # Format for frontend display
                 formatted_response = format_truelens_response(tool_response, processing_time)
                 formatted_response.session_id = session_id
 
-            # Check if agent response contains tool results (JSON response from tool)
-            if '"status": "success"' in agent_response or agent_response.startswith('{"status":'):
-                logger.info("Agent used search tool with optimized query")
-
-                # Calculate processing time
-                processing_time = (datetime.now() - start_time).total_seconds()
-
-                # Format the tool response
-                formatted_response = format_truelens_response(agent_response, processing_time)
-                formatted_response.session_id = session_id
-
-            elif "Search_Image" in agent_response and ("Action:" in agent_response or "Action Input:" in agent_response):
-                # Agent is trying to call the tool but hasn't executed it yet
-                logger.info("Agent is attempting to call tool, but tool execution failed")
-
-                # Try to extract the query from the agent response
-                try:
-                    # Look for the action input
-                    if "Action Input:" in agent_response:
-                        input_start = agent_response.find("Action Input:") + len("Action Input:")
-                        query_part = agent_response[input_start:].strip()
-                        # Remove quotes if present
-                        if query_part.startswith('"') and query_part.endswith('"'):
-                            query_part = query_part[1:-1]
-
-                        logger.info(f"Extracted query from agent: {query_part}")
-
-                        # Call the tool directly with the extracted query
-                        tool_response = await TrueLensSearchImageTool()._arun(query_part)
-
-                        # Calculate processing time
-                        processing_time = (datetime.now() - start_time).total_seconds()
-
-                        # Format the tool response
-                        formatted_response = format_truelens_response(tool_response, processing_time)
-                        formatted_response.session_id = session_id
-                    else:
-                        raise ValueError("Could not extract query from agent response")
-                except Exception as e:
-                    logger.error(f"Failed to extract and execute tool call: {str(e)}")
-                    # Fall back to conversational response
-                    processing_time = (datetime.now() - start_time).total_seconds()
-                    formatted_response = ChatResponse(
-                        response="I understand you want to search for artwork, but I'm having trouble processing your request. Could you please provide more details about what you're looking for?",
-                        images=None,
-                        session_id=session_id,
-                        processing_time=processing_time,
-                        suggestions=generate_suggestions_for_context(message.message)
-                    )
-
+            # If missing requirements, ask for clarification
             else:
-                # Agent provided conversational response
-                logger.info("Agent provided conversational response")
+                logger.info("Missing requirements, asking for clarification")
 
-                # Calculate processing time
                 processing_time = (datetime.now() - start_time).total_seconds()
 
-                # Format the agent response
-                formatted_response = ChatResponse(
-                    response=agent_response,
-                    images=None,
-                    session_id=session_id,
-                    processing_time=processing_time,
-                    suggestions=generate_suggestions_for_context(message.message)
-                )
-
-                # Check if we need to ask for specific information
                 missing_info = {}
                 if not requirements.get('style'):
                     missing_info["style"] = "What style do you prefer? (realistic, cartoon, abstract, etc.)"
@@ -1114,7 +1070,23 @@ async def truelens_chat(message: ChatMessage, background_tasks: BackgroundTasks)
                     missing_info["description"] = "What should the artwork look like?"
 
                 if missing_info:
-                    formatted_response.requires_input = missing_info
+                    formatted_response = ChatResponse(
+                        response="I'd be happy to help you find artwork! I need a bit more information to give you the best results.",
+                        images=None,
+                        session_id=session_id,
+                        requires_input=missing_info,
+                        processing_time=processing_time,
+                        suggestions=generate_suggestions_for_context(message.message)
+                    )
+                else:
+                    # Fallback conversational response
+                    formatted_response = ChatResponse(
+                        response="I understand you're looking for artwork. Could you please provide more details about what you're looking for?",
+                        images=None,
+                        session_id=session_id,
+                        processing_time=processing_time,
+                        suggestions=generate_suggestions_for_context(message.message)
+                    )
         
         except asyncio.TimeoutError:
             response = "I'm taking longer than expected to process your request. This might be due to high demand on our AI services. Please try again with a simpler request."
