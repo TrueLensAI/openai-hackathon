@@ -333,6 +333,7 @@ class TrueLensSearchImageTool(BaseTool):
     
     async def search_exa_ai_enhanced(self, query: str, purpose: str) -> List[Dict]:
         """Enhanced EXA AI search with TrueLensAI optimizations"""
+        logger.info("Exa AI Start")
         headers = {
             "X-API-Key": Config.EXA_AI_API_KEY,
             "Content-Type": "application/json"
@@ -379,7 +380,7 @@ class TrueLensSearchImageTool(BaseTool):
                     if self._is_valid_art_result(result):
                         enhanced_result = self._enhance_result_metadata(result)
                         enhanced_results.append(enhanced_result)
-                
+                logger.info("Exa AI Finish")
                 return enhanced_results[:10]  # Return top 10
                 
             except Exception as e:
@@ -435,6 +436,7 @@ class TrueLensSearchImageTool(BaseTool):
     
     async def vectorize_with_clarifai_enhanced(self, user_prompt: str, image_urls: List[str]) -> List[tuple]:
         """Enhanced Clarifai CLIP comparison with better error handling"""
+        logger.info("Clarifai Start")
         headers = {
             "Authorization": f"Key {Config.CLARIFAI_API_KEY}",
             "Content-Type": "application/json"
@@ -514,12 +516,13 @@ class TrueLensSearchImageTool(BaseTool):
                             
                             # Normalize to 0-1 range and apply smoothing
                             normalized_similarity = max(0, (similarity + 1) / 2)
+                            logger.info(normalized_similarity)
                             similarities.append((i, normalized_similarity))
                             
                         except Exception as e:
                             logger.warning(f"Error calculating similarity for image {i}: {str(e)}")
                             similarities.append((i, 0.0))
-                
+                logger.info("Clarifai Finish")
                 return similarities
                 
             except Exception as e:
@@ -799,69 +802,90 @@ def extract_requirements_ai(text: str) -> Dict[str, Optional[str]]:
         'style': style
     }
 
-def format_truelens_response(agent_response: str, processing_time: float = None) -> ChatResponse:
-    """Format agent response for TrueLensAI frontend"""
+def format_truelens_response(response: str, processing_time: float = None) -> ChatResponse:
+    """Format response for TrueLensAI frontend"""
     try:
         # Check if response contains JSON search results
-        if '"status": "success"' in agent_response:
+        if '"status": "success"' in response or response.startswith('{"status":'):
             # Extract JSON from response
-            json_start = agent_response.find('{"status"')
-            json_end = agent_response.rfind('}') + 1
-            
-            if json_start != -1 and json_end != -1:
-                json_str = agent_response[json_start:json_end]
+            if not response.startswith('{'):
+                json_start = response.find('{"status"')
+                json_end = response.rfind('}') + 1
+                
+                if json_start != -1 and json_end != -1:
+                    json_str = response[json_start:json_end]
+                else:
+                    logger.warning(f"Could not extract JSON from response: {response[:100]}...")
+                    return ChatResponse(
+                        response="I found some artwork but couldn't process the results properly. Please try again.",
+                        images=None,
+                        session_id="default",
+                        processing_time=processing_time
+                    )
+            else:
+                json_str = response
+                
+            try:
                 search_results = json.loads(json_str)
-                
-                # Format images for frontend
-                images = []
-                for result in search_results.get("results", []):
-                    images.append(ImageResult(
-                        image_url=result["image_url"],
-                        page_url=result["page_url"],
-                        title=result["title"],
-                        marketplace=result.get("marketplace"),
-                        price=result.get("price"),
-                        similarity_score=result["similarity_score"],
-                        purchase_steps=result.get("purchase_steps", []),
-                        metadata={
-                            "confidence": result.get("confidence", "medium"),
-                            "snippet": result.get("snippet", "")
-                        }
-                    ))
-                
-                # Create response text
-                response_text = f"🎨 **TrueLensAI found {len(images)} perfect matches!**\n\n"
-                response_text += "Using advanced AI vision technology, I've ranked these artworks by similarity to your request:\n\n"
-                
-                for i, img in enumerate(images[:3], 1):
-                    confidence_emoji = "🔥" if img.metadata.get("confidence") == "high" else "✨" if img.metadata.get("confidence") == "medium" else "💫"
-                    response_text += f"{confidence_emoji} **{img.title}** - {img.similarity_score*100:.0f}% match\n"
-                    if img.price:
-                        response_text += f"   💰 {img.price} on {img.marketplace}\n"
-                
-                response_text += f"\n🛒 Click any artwork above to purchase directly from the marketplace!"
-                
+            except json.JSONDecodeError as e:
+                logger.error(f"JSON decode error: {str(e)}, content: {json_str[:100]}...")
                 return ChatResponse(
-                    response=response_text,
-                    images=images,
+                    response="I found some artwork but couldn't process the results properly. Please try again.",
+                    images=None,
                     session_id="default",
-                    processing_time=processing_time,
-                    suggestions=search_results.get("suggestions", [])
+                    processing_time=processing_time
                 )
+                
+            # Format images for frontend
+            images = []
+            for result in search_results.get("results", []):
+                images.append(ImageResult(
+                    image_url=result["image_url"],
+                    page_url=result["page_url"],
+                    title=result["title"],
+                    marketplace=result.get("marketplace"),
+                    price=result.get("price"),
+                    similarity_score=result["similarity_score"],
+                    purchase_steps=result.get("purchase_steps", []),
+                    metadata={
+                        "confidence": result.get("confidence", "medium"),
+                        "snippet": result.get("snippet", "")
+                    }
+                ))
+            
+            # Create response text
+            response_text = f"🎨 **TrueLensAI found {len(images)} perfect matches!**\n\n"
+            response_text += "Using advanced AI vision technology, I've ranked these artworks by similarity to your request:\n\n"
+            
+            for i, img in enumerate(images[:3], 1):
+                confidence_emoji = "🔥" if img.metadata.get("confidence") == "high" else "✨" if img.metadata.get("confidence") == "medium" else "💫"
+                response_text += f"{confidence_emoji} **{img.title}** - {img.similarity_score*100:.0f}% match\n"
+                if img.price:
+                    response_text += f"   💰 {img.price} on {img.marketplace}\n"
+            
+            response_text += f"\n🛒 Click any artwork above to purchase directly from the marketplace!"
+            
+            return ChatResponse(
+                response=response_text,
+                images=images,
+                session_id="default",
+                processing_time=processing_time,
+                suggestions=search_results.get("suggestions", [])
+            )
         
         # Handle cases where user needs to provide more information
-        elif any(phrase in agent_response.lower() for phrase in ["need", "missing", "provide", "tell me"]):
+        elif any(phrase in response.lower() for phrase in ["need", "missing", "provide", "tell me"]):
             # Extract what's missing
             missing_info = {}
-            if "purpose" in agent_response.lower():
+            if "purpose" in response.lower():
                 missing_info["purpose"] = "What is this artwork for? (logo, decoration, poster, etc.)"
-            if "style" in agent_response.lower():
+            if "style" in response.lower():
                 missing_info["style"] = "What style do you prefer? (realistic, cartoon, abstract, etc.)"
-            if "description" in agent_response.lower() or "depict" in agent_response.lower():
+            if "description" in response.lower() or "depict" in response.lower():
                 missing_info["description"] = "What should the artwork look like?"
             
             return ChatResponse(
-                response=agent_response,
+                response=response,
                 images=None,
                 session_id="default",
                 requires_input=missing_info if missing_info else None,
@@ -875,7 +899,7 @@ def format_truelens_response(agent_response: str, processing_time: float = None)
         
         # Regular conversational response
         return ChatResponse(
-            response=agent_response,
+            response=response,
             images=None,
             session_id="default",
             processing_time=processing_time
@@ -884,7 +908,7 @@ def format_truelens_response(agent_response: str, processing_time: float = None)
     except Exception as e:
         logger.error(f"Error formatting TrueLensAI response: {str(e)}")
         return ChatResponse(
-            response=agent_response,
+            response=response,
             images=None,
             session_id="default",
             processing_time=processing_time
@@ -955,36 +979,116 @@ async def truelens_chat(message: ChatMessage, background_tasks: BackgroundTasks)
         # Get or create session
         session_id = session_manager.get_or_create_session(message.session_id)
         
-        # Create TrueLensAI agent for this session
-        agent = create_truelens_agent(session_id)
-        
         # Log the interaction
         logger.info(f"TrueLensAI Chat - Session: {session_id[:8]}, User: {message.user_id}, Message: {message.message[:50]}...")
         
-        # Process the message with enhanced prompt
+        # Create LLM instance
+        llm = TrueLensGPTOSS()
+        
+        # Create tool instance
+        search_tool = TrueLensSearchImageTool()
+        
+        # Get memory for this session
+        memory = session_manager.get_session_memory(session_id)
+        
+        # Process the message with enhanced prompt to determine if we need to use the tool
         enhanced_prompt = f"{TRUELENS_SYSTEM_PROMPT}\n\nUser: {message.message}\nTrueLensAI Assistant:"
         
-        # Run agent with timeout protection
         try:
-            response = await asyncio.wait_for(
-                agent.arun(input=enhanced_prompt),
-                timeout=60.0  # 60 second timeout
+            # First model call to determine if we need to use the tool
+            initial_response = await asyncio.wait_for(
+                llm._acall(enhanced_prompt),
+                timeout=30.0  # 30 second timeout
             )
+            
+            # Extract requirements from user message
+            requirements = extract_requirements_ai(message.message)
+            
+            # Check if we have all required parameters for image search
+            has_all_requirements = all([
+                requirements.get('purpose'),
+                requirements.get('description'),
+                requirements.get('style')
+            ])
+            
+            # If we have all requirements and the model suggests using the tool
+            if has_all_requirements and "TrueLensSearchImageTool" in initial_response:
+                logger.info("Using search tool directly")
+                
+                # Prepare search parameters
+                search_params = {
+                    "purpose": requirements['purpose'],
+                    "description": requirements['description'],
+                    "style": requirements['style']
+                }
+                
+                # Call the tool directly
+                tool_response = await search_tool._arun(json.dumps(search_params))
+                
+                # Save the interaction in memory
+                if memory:
+                    memory.chat_memory.add_user_message(message.message)
+                    memory.chat_memory.add_ai_message(f"I'll search for {requirements['style']} {requirements['description']} for {requirements['purpose']} purposes.")
+                
+                # Calculate processing time
+                processing_time = (datetime.now() - start_time).total_seconds()
+                
+                # Format the tool response directly
+                formatted_response = format_truelens_response(tool_response, processing_time)
+                formatted_response.session_id = session_id
+                
+            else:
+                # If we don't have all requirements or the model doesn't suggest using the tool
+                logger.info("Using model response directly")
+                
+                # Save the interaction in memory
+                if memory:
+                    memory.chat_memory.add_user_message(message.message)
+                    memory.chat_memory.add_ai_message(initial_response)
+                
+                # Calculate processing time
+                processing_time = (datetime.now() - start_time).total_seconds()
+                
+                # Format the model response
+                formatted_response = ChatResponse(
+                    response=initial_response,
+                    images=None,
+                    session_id=session_id,
+                    processing_time=processing_time,
+                    suggestions=generate_suggestions_for_context(message.message)
+                )
+                
+                # Check if we need to ask for specific information
+                missing_info = {}
+                if not requirements.get('purpose'):
+                    missing_info["purpose"] = "What is this artwork for? (logo, decoration, poster, etc.)"
+                if not requirements.get('style'):
+                    missing_info["style"] = "What style do you prefer? (realistic, cartoon, abstract, etc.)"
+                if not requirements.get('description'):
+                    missing_info["description"] = "What should the artwork look like?"
+                
+                if missing_info:
+                    formatted_response.requires_input = missing_info
+        
         except asyncio.TimeoutError:
             response = "I'm taking longer than expected to process your request. This might be due to high demand on our AI services. Please try again with a simpler request."
-        except Exception as agent_error:
-            logger.error(f"Agent execution error: {str(agent_error)}")
-            if "OUTPUT_PARSING_FAILURE" in str(agent_error) or "parsing" in str(agent_error).lower():
-                response = "I had trouble processing that request. Please try rephrasing your message or try again in a moment."
-            else:
-                response = "I encountered an issue while processing your request. Please try again."
-        
-        # Calculate processing time
-        processing_time = (datetime.now() - start_time).total_seconds()
-        
-        # Format response for TrueLensAI frontend
-        formatted_response = format_truelens_response(response, processing_time)
-        formatted_response.session_id = session_id
+            formatted_response = ChatResponse(
+                response=response,
+                images=None,
+                session_id=session_id,
+                processing_time=(datetime.now() - start_time).total_seconds(),
+                suggestions=generate_suggestions_for_context(message.message)
+            )
+        except Exception as error:
+            logger.error(f"Processing error: {str(error)}")
+            response = "I had trouble processing that request. Please try rephrasing your message or try again in a moment."
+            formatted_response = ChatResponse(
+                response=response,
+                images=None,
+                session_id=session_id,
+                processing_time=(datetime.now() - start_time).total_seconds(),
+                suggestions=generate_suggestions_for_context(message.message)
+            )
         
         # Add contextual suggestions if none provided
         if not formatted_response.suggestions:
