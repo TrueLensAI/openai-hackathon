@@ -157,7 +157,6 @@ const App: React.FC = () => {
           menuButtonRef={menuButtonRef}
           isFadingOut={isFadingOut}
           goToInputPage={goToInputPage}
-          goToEthos={goToEthos}
         />
       </div>
 

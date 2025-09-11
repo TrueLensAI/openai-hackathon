@@ -33,17 +33,21 @@ export const useImageSearch = () => {
       setIsLoading(true);
 
       try {
-        const response = await fetch("/api/chat", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            message: messageText,
-            session_id: sessionId,
-            user_id: userId,
-          }),
-        });
+        console.log(import.meta.env.VITE_TARGET);
+        const response = await fetch(
+          `${import.meta.env.VITE_TARGET}/api/chat`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              message: messageText,
+              session_id: sessionId,
+              user_id: userId,
+            }),
+          }
+        );
 
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
