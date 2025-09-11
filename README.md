@@ -19,10 +19,10 @@
 
   #### Install the dependencies
   ` 
-    git clone https://github.com/TrueLensAI/openai-hackathon
-    cd openai-hackathon
-    npm install
-    cd server
+    git clone https://github.com/TrueLensAI/openai-hackathon &&
+    cd openai-hackathon &&
+    npm install &&
+    cd backend &&
     pip install -r requirements.txt
   `
   #### Open a terminal window and run:
