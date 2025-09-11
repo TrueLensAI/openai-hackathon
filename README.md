@@ -16,6 +16,13 @@
 ![Clarifai](https://img.shields.io/badge/Clarifai-0270e0?style=for-the-badge&logo=clarifai&logoColor=white)
 
 ## Instructions
+### Live Testing
+ #### Open the server by visiting:
+ https://openai-hackathon-yb1r.onrender.com/
+ #### Open Website
+ https://openai-hackathon-eta.vercel.app
+ 
+### Local Development
 
   #### Install the dependencies
   ` 
@@ -30,7 +37,33 @@
 
   #### In a seperate terminal window run `main.py` or click the run button with VS Code
 
-#### Visit https://localhost:5173 and start typing!
+  #### Set your env variables by using the .env.example both for the front end and backend, before visiting https://localhost:5173.
+    /.env
+    
+    ` VITE_TARGET=https://localhost:8000 `
+    
+    /backend/.env
+    
+        `# HuggingFace GPT-OSS-20B Configuration
+          HUGGINGFACE_API_KEY=""
+          HUGGINGFACE_ENDPOINT=https://router.huggingface.co/v1/chat/completions
+          HUGGINGFACE_MODEL=openai/gpt-oss-20b
+
+          # EXA AI for Art Search
+          EXA_AI_API_KEY=""
+          # Clarifai for Image Vectorization
+          CLARIFAI_API_KEY=""
+          CLARIFAI_USER_ID=clarifai
+          CLARIFAI_APP_ID=main
+
+          # Server Configuration
+          PORT=8000
+          HOST=0.0.0.0
+          ENVIRONMENT=development
+          FRONTEND_URL=http://localhost:5173
+          `
+          
+  #### And then start typing!
 
 ## Value proposition
 TrueLens aims to prove advances within the AI space don't inherently come at the cost of human creativity and skills. As fear of replacement continues lingers within fields of Creative Arts, Music, and Computer Science, TrueLens provides a solution that expands access to one of the most impacted industries.
