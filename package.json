@@ -5,8 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
-    "lint": "eslint .",
+    "dev:full": "concurrently \"npm run dev\" \"npm run backend\"",
+    "backend": "cd backend && python main.py",
+    "backend:install": "cd backend && pip install -r requirements.txt",
+    "build": "vite build",
     "preview": "vite preview"
   },
   "dependencies": {
