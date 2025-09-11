@@ -1,4 +1,5 @@
 # backend/main.py - Complete Backend for TrueLensAI Integration
+import string
 from fastapi import FastAPI, HTTPException, Depends, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -91,6 +92,7 @@ async def lifespan(app: FastAPI):
     # Shutdown
     logger.info("🛑 Shutting down TrueLensAI Backend...")
     session_manager.sessions.clear()
+    session_manager.user_memories.clear()
     logger.info("✅ Cleanup complete")
 
 # FastAPI app initialization
@@ -128,7 +130,6 @@ class ChatMessage(BaseModel):
         return v or datetime.now()
 
 class ImageSearchParams(BaseModel):
-    purpose: str = Field(..., description="Image purpose (logo, design, decoration, etc.)")
     description: str = Field(..., description="Visual description of the desired image")
     style: str = Field(..., description="Art style (realistic, cartoon, abstract, etc.)")
     
@@ -163,35 +164,41 @@ class HealthResponse(BaseModel):
 
 class SessionManager:
     def __init__(self):
-        self.sessions = {}
+        self.user_memories = {}  # Store memories by user_id
+        self.sessions = {}  # Keep sessions for temporary state
         self.cleanup_interval = 3600  # 1 hour
-    
+
+    def get_or_create_memory(self, user_id: str) -> ConversationBufferWindowMemory:
+        """Get or create memory for a specific user"""
+        if user_id not in self.user_memories:
+            self.user_memories[user_id] = ConversationBufferWindowMemory(
+                memory_key="chat_history",
+                return_messages=True,
+                k=20  # Keep last 20 exchanges for better context
+            )
+        return self.user_memories[user_id]
+
     def get_or_create_session(self, session_id: str = None) -> str:
         if not session_id:
             session_id = str(uuid.uuid4())
-        
+
         if session_id not in self.sessions:
             self.sessions[session_id] = {
                 'created_at': datetime.now(),
-                'memory': ConversationBufferWindowMemory(
-                    memory_key="chat_history",
-                    return_messages=True,
-                    k=10  # Keep last 10 exchanges
-                ),
                 'user_context': {},
                 'last_activity': datetime.now()
             }
         else:
             self.sessions[session_id]['last_activity'] = datetime.now()
-        
+
         return session_id
-    
-    def get_session_memory(self, session_id: str):
-        session = self.sessions.get(session_id)
-        return session['memory'] if session else None
+
+    def get_user_memory(self, user_id: str) -> ConversationBufferWindowMemory:
+        """Get memory for a specific user"""
+        return self.user_memories.get(user_id)
     
     def cleanup_sessions(self):
-        """Remove inactive sessions"""
+        """Remove inactive sessions and old user memories"""
         cutoff = datetime.now() - timedelta(hours=1)
         inactive_sessions = [
             sid for sid, session in self.sessions.items()
@@ -199,7 +206,17 @@ class SessionManager:
         ]
         for sid in inactive_sessions:
             del self.sessions[sid]
-        logger.info(f"Cleaned up {len(inactive_sessions)} inactive sessions")
+
+        # Clean up old user memories (keep for 24 hours)
+        memory_cutoff = datetime.now() - timedelta(hours=24)
+        old_memories = [
+            uid for uid, memory in self.user_memories.items()
+            if not hasattr(memory, 'last_activity') or memory.last_activity < memory_cutoff
+        ]
+        for uid in old_memories:
+            del self.user_memories[uid]
+
+        logger.info(f"Cleaned up {len(inactive_sessions)} inactive sessions and {len(old_memories)} old memories")
 
 session_manager = SessionManager()
 
@@ -214,7 +231,7 @@ class TrueLensGPTOSS(LLM):
     endpoint_url: str = ""
     model_name: str = ""
     max_tokens: int = 512
-    temperature: float = 0.7
+    temperature: float = 0.3
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -321,47 +338,34 @@ class TrueLensSearchImageTool(BaseTool):
     name: str = "Search_Image"
     description: str = """Advanced art search tool for TrueLensAI platform.
     Searches multiple art marketplaces and uses AI vision to rank results by similarity.
-    Input: JSON with keys: purpose, description, style"""
-    supported_marketplaces: List[str] = []
+    Input: A single optimized search query string (e.g., "realistic mountain landscape painting").
+    This tool will search for artwork matching the query and return ranked results with similarity scores."""
 
     def __init__(self):
         super().__init__()
-        self.supported_marketplaces = [
-            "etsy.com", "artfinder.com", "saatchiart.com", "1stdibs.com",
-            "artsy.net", "invaluable.com", "artnet.com"
-        ]
+
     
-    async def search_exa_ai_enhanced(self, query: str, purpose: str) -> List[Dict]:
+    async def search_exa_ai_enhanced(self, query) -> List[Dict]:
         """Enhanced EXA AI search with TrueLensAI optimizations"""
         logger.info("Exa AI Start")
         headers = {
             "X-API-Key": Config.EXA_AI_API_KEY,
             "Content-Type": "application/json"
         }
-        
-        # Craft search query based on purpose
-        purpose_contexts = {
-            "logo": "logo design branding commercial use",
-            "decoration": "wall art home decor interior design",
-            "poster": "poster print wall art large format",
-            "artwork": "original art painting drawing",
-            "design": "graphic design creative artwork"
-        }
-        
-        context = purpose_contexts.get(purpose.lower(), "artwork")
-        enhanced_query = f"{query} {context} for sale buy purchase"
+        logger.info(query)
+
         
         payload = {
-            "query": enhanced_query,
+            "query": query,
             "type": "neural",
             "useAutoprompt": True,
-            "numResults": 15,  # Get more results for better ranking
-            "includeDomains": self.supported_marketplaces,
+            "includeDomains": ["https://www.shutterstock.com", "https://stock.adobe.com", "https://www.gettyimages.com", "https://www.istockphoto.com", "https://depositphotos.com", "https://pixabay.com", "https://unsplash.com", "https://www.pexels.com", "https://www.freepik.com", "https://www.vecteezy.com", "https://creativemarket.com", "https://www.etsy.com", "https://www.deviantart.com", "https://www.artstation.com", "https://www.behance.net", "https://dribbble.com", "https://www.iconfinder.com", "https://thenounproject.com", "https://icons8.com", "https://www.flaticon.com", "https://www.stockvault.net", "https://burst.shopify.com", "https://stocksnap.io", "https://picjumbo.com", "https://500px.com", "https://www.flickr.com", "https://www.artsy.net", "https://www.saatchiart.com", "https://fineartamerica.com", "https://society6.com"],
+            "numResults": 30,  # Get more results for better ranking
+            "excludeText": ["ai"],
             "contents": {
-                "image": {"maxResults": 5},
-                "text": {"maxCharacters": 500}
+                "text": True,
+                "livecrawl": "always"
             },
-            "category": "art"
         }
         
         async with httpx.AsyncClient(timeout=30.0) as client:
@@ -410,10 +414,6 @@ class TrueLensSearchImageTool(BaseTool):
         
         # Identify marketplace
         marketplace = "Unknown"
-        for mp in self.supported_marketplaces:
-            if mp in url.lower():
-                marketplace = mp.replace(".com", "").title()
-                break
         
         # Extract price from title/snippet (basic extraction)
         price = None
@@ -482,7 +482,7 @@ class TrueLensSearchImageTool(BaseTool):
         async with httpx.AsyncClient(timeout=45.0) as client:
             try:
                 response = await client.post(
-                    "https://api.clarifai.com/v2/models/multimodal-clip-embed/outputs",
+                    "https://clarifai.com/clarifai/main/models/image-embedder-clip",
                     headers=headers,
                     json=payload
                 )
@@ -594,38 +594,47 @@ class TrueLensSearchImageTool(BaseTool):
     
     async def _arun(self, query: str) -> str:
         start_time = datetime.now()
-        
+
         try:
-            # Parse search parameters
-            if isinstance(query, str):
-                try:
-                    search_params = json.loads(query)
-                except json.JSONDecodeError:
+            # Handle optimized query string input from model
+            if isinstance(query, str) and not query.startswith('{'):
+                # Direct optimized query string from model
+                search_query = query.strip()
+                # Extract description and style for user_prompt (basic extraction)
+                requirements = extract_requirements_ai(search_query)
+                description = requirements.get('description', search_query)
+                style = requirements.get('style', 'artwork')
+                user_prompt = f"A {style} style {description}"
+            else:
+                # Fallback: Parse search parameters (for backward compatibility)
+                if isinstance(query, str):
+                    try:
+                        search_params = json.loads(query)
+                    except json.JSONDecodeError:
+                        return json.dumps({
+                            "status": "error",
+                            "message": "Invalid search parameters format"
+                        })
+                else:
+                    search_params = query
+
+                description = search_params.get("description", "").strip()
+                style = search_params.get("style", "").strip()
+
+                if not all([description, style]):
                     return json.dumps({
                         "status": "error",
-                        "message": "Invalid search parameters format"
+                        "message": "Missing required parameters: description, or style"
                     })
-            else:
-                search_params = query
-            
-            purpose = search_params.get("purpose", "").strip()
-            description = search_params.get("description", "").strip()
-            style = search_params.get("style", "").strip()
-            
-            if not all([purpose, description, style]):
-                return json.dumps({
-                    "status": "error",
-                    "message": "Missing required parameters: purpose, description, or style"
-                })
-            
-            # Construct enhanced search query
-            search_query = f"{style} {description} {purpose}".strip()
-            user_prompt = f"A {style} style {description} for {purpose} purposes"
+
+                # Construct enhanced search query
+                search_query = f"{style} {description}".strip()
+                user_prompt = f"A {style} style {description}"
             
             logger.info(f"TrueLensAI search: {search_query}")
             
             # Search EXA AI with enhancements
-            search_results = await self.search_exa_ai_enhanced(search_query, purpose)
+            search_results = await self.search_exa_ai_enhanced(search_query)
             
             if not search_results:
                 return json.dumps({
@@ -719,28 +728,53 @@ class TrueLensSearchImageTool(BaseTool):
 # TRUELENSAI SYSTEM PROMPT & AGENT
 # =============================================
 
-TRUELENS_SYSTEM_PROMPT = """"
-You are an art search assistant. You must verify that the user's request contains:
-1. Image Purpose (Logo, Design, Advertisement, etc.)
-2. Image Description (detailed description of what they want)
-3. Image Style (Cartoon, Realistic, Abstract, Minimalist, etc.)
+TRUELENS_SYSTEM_PROMPT = f""""
+You are a professional Art Search Assistant named TrueLens. Your primary function is to facilitate image searches for users. Your process is iterative and conversational.
 
-Build upon your understanding as the user provides new information with every response
-If the user provides all three throughout the conversation, respond with the tool: "TrueLensSearchImageTool"
-If missing any, ask for one of the missing pieces of information in one kind sentence with examples.
+Core Directives:
+
+Requirement Verification: You must verify that the user's request contains the following two essential components:
+
+General Image Description: A detailed description of the subject, scene, or objects within the desired image.
+
+General Image Style: The artistic style of the image (e.g., Cartoon, Realistic, Abstract, Minimalist, Watercolor, Oil Painting, etc.).
+
+Iterative Understanding: You will build upon and refine your understanding of the user's request with each new response they provide. If a user provides new information that fills in a missing component, you will update your internal state accordingly.
+
+Completion and Action:
+
+Once the user has provided a clear General Image Description and General Image Style, you are to process their query.
+
+Format the complete query into a single, optimized string for a neural vector search that will be used as input for Exa AI search.
+
+Once the optimized query is formatted, you MUST call the TrueLensSearchImageTool with the optimized query string as the input parameter.
+
+IMPORTANT: When calling the tool, use this exact format:
+Action: Search_Image
+Action Input: "your optimized query string here"
+
+Handling Missing Information:
+
+If the user's request is missing the General Image Description or the General Image Style, provide a concise, one-line suggestion to guide the user. The suggestion should highlight the missing element.
+
+Example suggestions:
+
+If missing the description: "Please provide a more detailed description of the image you have in mind."
+
+If missing the style: "Could you please specify the art style you are looking for (e.g., cartoon, realistic, oil painting)?"
 """
 
 # Initialize LLM and tools for TrueLensAI
-def create_truelens_agent(session_id: str):
+def create_truelens_agent(user_id: str):
     """Create a TrueLensAI-specific agent instance"""
     llm = TrueLensGPTOSS()
     tools = [TrueLensSearchImageTool()]
-    memory = session_manager.get_session_memory(session_id)
-    
+    memory = session_manager.get_or_create_memory(user_id)
+
     agent = initialize_agent(
         tools=tools,
         llm=llm,
-        agent=AgentType.CONVERSATIONAL_REACT_DESCRIPTION,
+        agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
         memory=memory,
         verbose=True,
         max_iterations=3,
@@ -750,7 +784,7 @@ def create_truelens_agent(session_id: str):
             "system_message": TRUELENS_SYSTEM_PROMPT
         }
     )
-    
+
     return agent
 
 # =============================================
@@ -758,17 +792,8 @@ def create_truelens_agent(session_id: str):
 # =============================================
 
 def extract_requirements_ai(text: str) -> Dict[str, Optional[str]]:
-    """AI-powered extraction of purpose, description, style"""
+    """AI-powered extraction of description, style"""
     text_lower = text.lower()
-    
-    # Enhanced keyword matching
-    purpose_keywords = {
-        'logo': ['logo', 'branding', 'brand', 'business', 'company'],
-        'decoration': ['decoration', 'decor', 'wall art', 'living room', 'bedroom', 'office', 'home'],
-        'poster': ['poster', 'print', 'wall', 'large format'],
-        'artwork': ['artwork', 'art piece', 'painting', 'drawing'],
-        'design': ['design', 'graphic', 'creative', 'visual']
-    }
     
     style_keywords = {
         'realistic': ['realistic', 'photorealistic', 'detailed', 'lifelike'],
@@ -778,14 +803,6 @@ def extract_requirements_ai(text: str) -> Dict[str, Optional[str]]:
         'cartoon': ['cartoon', 'animated', 'comic', 'illustration'],
         'vintage': ['vintage', 'retro', 'classic', 'old-style']
     }
-    
-    # Extract purpose
-    purpose = None
-    for key, keywords in purpose_keywords.items():
-        if any(keyword in text_lower for keyword in keywords):
-            purpose = key
-            break
-    
     # Extract style
     style = None
     for key, keywords in style_keywords.items():
@@ -797,7 +814,6 @@ def extract_requirements_ai(text: str) -> Dict[str, Optional[str]]:
     description = text.strip()
     
     return {
-        'purpose': purpose,
         'description': description,
         'style': style
     }
@@ -859,9 +875,9 @@ def format_truelens_response(response: str, processing_time: float = None) -> Ch
             
             for i, img in enumerate(images[:3], 1):
                 confidence_emoji = "🔥" if img.metadata.get("confidence") == "high" else "✨" if img.metadata.get("confidence") == "medium" else "💫"
-                response_text += f"{confidence_emoji} **{img.title}** - {img.similarity_score*100:.0f}% match\n"
+                response_text += f"{confidence_emoji} **{img.title}** - {img.similarity_score*100:.0f}% match </br> \n"
                 if img.price:
-                    response_text += f"   💰 {img.price} on {img.marketplace}\n"
+                    response_text += f"   💰 {img.price} on {img.marketplace}\n </br> "
             
             response_text += f"\n🛒 Click any artwork above to purchase directly from the marketplace!"
             
@@ -877,8 +893,6 @@ def format_truelens_response(response: str, processing_time: float = None) -> Ch
         elif any(phrase in response.lower() for phrase in ["need", "missing", "provide", "tell me"]):
             # Extract what's missing
             missing_info = {}
-            if "purpose" in response.lower():
-                missing_info["purpose"] = "What is this artwork for? (logo, decoration, poster, etc.)"
             if "style" in response.lower():
                 missing_info["style"] = "What style do you prefer? (realistic, cartoon, abstract, etc.)"
             if "description" in response.lower() or "depict" in response.lower():
@@ -974,99 +988,131 @@ async def root():
 async def truelens_chat(message: ChatMessage, background_tasks: BackgroundTasks):
     """Main chat endpoint for TrueLensAI"""
     start_time = datetime.now()
-    
+
     try:
         # Get or create session
         session_id = session_manager.get_or_create_session(message.session_id)
-        
+
+        # Get or create memory for this user
+        user_id = message.user_id or "anonymous"
+        memory = session_manager.get_or_create_memory(user_id)
+
         # Log the interaction
-        logger.info(f"TrueLensAI Chat - Session: {session_id[:8]}, User: {message.user_id}, Message: {message.message[:50]}...")
-        
-        # Create LLM instance
-        llm = TrueLensGPTOSS()
-        
-        # Create tool instance
-        search_tool = TrueLensSearchImageTool()
-        
-        # Get memory for this session
-        memory = session_manager.get_session_memory(session_id)
-        
-        # Process the message with enhanced prompt to determine if we need to use the tool
-        enhanced_prompt = f"{TRUELENS_SYSTEM_PROMPT}\n\nUser: {message.message}\nTrueLensAI Assistant:"
-        
+        logger.info(f"TrueLensAI Chat - Session: {session_id[:8]}, User: {user_id}, Message: {message.message[:50]}...")
+
+        # Create agent for TrueLensAI
+        agent = create_truelens_agent(user_id)
+
         try:
-            # First model call to determine if we need to use the tool
-            initial_response = await asyncio.wait_for(
-                llm._acall(enhanced_prompt),
-                timeout=30.0  # 30 second timeout
+            # Log the incoming message
+            logger.info(f"Processing message: {message.message}")
+
+            # Use the agent to process the message - this allows the model to format optimized query and call tool
+            agent_response = await asyncio.get_event_loop().run_in_executor(
+                None, agent.run, message.message
             )
-            
-            # Extract requirements from user message
+
+            logger.info(f"Agent response: {agent_response[:200]}...")
+
+            # Extract requirements from user message for fallback handling
             requirements = extract_requirements_ai(message.message)
-            
-            # Check if we have all required parameters for image search
+
+            # Check if we have all requirements and agent didn't successfully call tool
             has_all_requirements = all([
-                requirements.get('purpose'),
                 requirements.get('description'),
                 requirements.get('style')
             ])
-            
-            # If we have all requirements and the model suggests using the tool
-            if has_all_requirements and "TrueLensSearchImageTool" in initial_response:
-                logger.info("Using search tool directly")
-                
-                # Prepare search parameters
-                search_params = {
-                    "purpose": requirements['purpose'],
-                    "description": requirements['description'],
-                    "style": requirements['style']
-                }
-                
+
+            # If we have requirements but agent failed to call tool properly, do it manually
+            if has_all_requirements and not ('"status": "success"' in agent_response or agent_response.startswith('{"status":')):
+                logger.info("Agent failed to call tool, falling back to manual tool call")
+
+                # Format optimized query
+                optimized_query = f"{requirements['style']} {requirements['description']}".strip()
+
                 # Call the tool directly
-                tool_response = await search_tool._arun(json.dumps(search_params))
-                
-                # Save the interaction in memory
-                if memory:
-                    memory.chat_memory.add_user_message(message.message)
-                    memory.chat_memory.add_ai_message(f"I'll search for {requirements['style']} {requirements['description']} for {requirements['purpose']} purposes.")
-                
+                tool_response = await TrueLensSearchImageTool()._arun(optimized_query)
+
                 # Calculate processing time
                 processing_time = (datetime.now() - start_time).total_seconds()
-                
-                # Format the tool response directly
+
+                # Format the tool response
                 formatted_response = format_truelens_response(tool_response, processing_time)
                 formatted_response.session_id = session_id
-                
-            else:
-                # If we don't have all requirements or the model doesn't suggest using the tool
-                logger.info("Using model response directly")
-                
-                # Save the interaction in memory
-                if memory:
-                    memory.chat_memory.add_user_message(message.message)
-                    memory.chat_memory.add_ai_message(initial_response)
-                
+
+            # Check if agent response contains tool results (JSON response from tool)
+            if '"status": "success"' in agent_response or agent_response.startswith('{"status":'):
+                logger.info("Agent used search tool with optimized query")
+
                 # Calculate processing time
                 processing_time = (datetime.now() - start_time).total_seconds()
-                
-                # Format the model response
+
+                # Format the tool response
+                formatted_response = format_truelens_response(agent_response, processing_time)
+                formatted_response.session_id = session_id
+
+            elif "Search_Image" in agent_response and ("Action:" in agent_response or "Action Input:" in agent_response):
+                # Agent is trying to call the tool but hasn't executed it yet
+                logger.info("Agent is attempting to call tool, but tool execution failed")
+
+                # Try to extract the query from the agent response
+                try:
+                    # Look for the action input
+                    if "Action Input:" in agent_response:
+                        input_start = agent_response.find("Action Input:") + len("Action Input:")
+                        query_part = agent_response[input_start:].strip()
+                        # Remove quotes if present
+                        if query_part.startswith('"') and query_part.endswith('"'):
+                            query_part = query_part[1:-1]
+
+                        logger.info(f"Extracted query from agent: {query_part}")
+
+                        # Call the tool directly with the extracted query
+                        tool_response = await TrueLensSearchImageTool()._arun(query_part)
+
+                        # Calculate processing time
+                        processing_time = (datetime.now() - start_time).total_seconds()
+
+                        # Format the tool response
+                        formatted_response = format_truelens_response(tool_response, processing_time)
+                        formatted_response.session_id = session_id
+                    else:
+                        raise ValueError("Could not extract query from agent response")
+                except Exception as e:
+                    logger.error(f"Failed to extract and execute tool call: {str(e)}")
+                    # Fall back to conversational response
+                    processing_time = (datetime.now() - start_time).total_seconds()
+                    formatted_response = ChatResponse(
+                        response="I understand you want to search for artwork, but I'm having trouble processing your request. Could you please provide more details about what you're looking for?",
+                        images=None,
+                        session_id=session_id,
+                        processing_time=processing_time,
+                        suggestions=generate_suggestions_for_context(message.message)
+                    )
+
+            else:
+                # Agent provided conversational response
+                logger.info("Agent provided conversational response")
+
+                # Calculate processing time
+                processing_time = (datetime.now() - start_time).total_seconds()
+
+                # Format the agent response
                 formatted_response = ChatResponse(
-                    response=initial_response,
+                    response=agent_response,
                     images=None,
                     session_id=session_id,
                     processing_time=processing_time,
                     suggestions=generate_suggestions_for_context(message.message)
                 )
-                
+
                 # Check if we need to ask for specific information
                 missing_info = {}
-                if not requirements.get('purpose'):
-                    missing_info["purpose"] = "What is this artwork for? (logo, decoration, poster, etc.)"
                 if not requirements.get('style'):
                     missing_info["style"] = "What style do you prefer? (realistic, cartoon, abstract, etc.)"
                 if not requirements.get('description'):
                     missing_info["description"] = "What should the artwork look like?"
-                
+
                 if missing_info:
                     formatted_response.requires_input = missing_info
         
@@ -1151,24 +1197,24 @@ async def health_check():
         uptime=(datetime.now() - start_time).total_seconds()
     )
 
-@app.get("/api/sessions/{session_id}/history")
-async def get_session_history(session_id: str):
-    """Get chat history for a specific session"""
-    memory = session_manager.get_session_memory(session_id)
+@app.get("/api/users/{user_id}/history")
+async def get_user_history(user_id: str):
+    """Get chat history for a specific user"""
+    memory = session_manager.get_user_memory(user_id)
     if not memory:
-        raise HTTPException(status_code=404, detail="Session not found")
-    
+        raise HTTPException(status_code=404, detail="User memory not found")
+
     # Extract chat history
     messages = memory.chat_memory.messages
     history = []
-    
+
     for msg in messages:
         if isinstance(msg, HumanMessage):
             history.append({"type": "user", "content": msg.content})
         elif isinstance(msg, AIMessage):
             history.append({"type": "assistant", "content": msg.content})
-    
-    return {"session_id": session_id, "history": history}
+
+    return {"user_id": user_id, "history": history}
 
 @app.delete("/api/sessions/{session_id}")
 async def clear_session(session_id: str):
@@ -1184,9 +1230,10 @@ async def get_stats():
     """Get platform statistics"""
     return {
         "active_sessions": len(session_manager.sessions),
+        "active_user_memories": len(session_manager.user_memories),
         "total_interactions": sum(
-            len(session['memory'].chat_memory.messages) 
-            for session in session_manager.sessions.values()
+            len(memory.chat_memory.messages)
+            for memory in session_manager.user_memories.values()
         ),
         "uptime": "N/A",  # Implement actual uptime tracking
         "version": "1.0.0",

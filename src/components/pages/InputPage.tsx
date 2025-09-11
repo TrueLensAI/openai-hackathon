@@ -68,6 +68,10 @@ const InputPage: React.FC<InputPageProps> = ({
     };
   }, [searchInputRef]);
 
+  const formatMessage = (content: string) => {
+    return content.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
+  };
+
   return (
     <>
       {/* Custom styles for animations */}
@@ -153,22 +157,23 @@ const InputPage: React.FC<InputPageProps> = ({
             </div>
           )}
           {/* Messages */}
-<div className="w-full mt-8 sm:mt-12 flex flex-col-reverse gap-4">
-  {messages.reverse().map((m, idx) => {
-    if (m.type === "assistant" && m.content) {
-      return (
-        <div
-          key={idx}
-          className="bg-stone-800/50 text-stone-100 p-4 rounded-lg max-w-3xl mx-auto animate-fade-in-up"
-        >
-          {m.content}
-        </div>
-      );
-    }
-    return null;
-  })}
-</div>
+          <div className="w-full mt-8 sm:mt-12 flex flex-col-reverse gap-4">
+            {messages.reverse().map((m, idx) => {
+              if (m.type === "assistant" && m.content) {
+                // Format message content to handle bold text
+                const formattedContent = formatMessage(m.content);
 
+                return (
+                  <div
+                    key={idx}
+                    className="bg-stone-800/50 text-stone-100 p-4 rounded-lg max-w-3xl mx-auto animate-fade-in-up"
+                    dangerouslySetInnerHTML={{ __html: formattedContent }}
+                  />
+                );
+              }
+              return null;
+            })}
+          </div>
 
           {/* Image Results */}
           {latestAssistantMessage && latestAssistantMessage.images && (
