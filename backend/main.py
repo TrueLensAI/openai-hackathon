@@ -273,7 +273,7 @@ class TrueLensGPTOSS(LLM):
         
         async with httpx.AsyncClient(timeout=45.0) as client:
             try:
-                response = await client.post(
+                response = await client.POST(
                     self.endpoint_url,
                     headers=headers,
                     json=payload
@@ -1078,7 +1078,7 @@ async def truelens_chat(message: ChatMessage, background_tasks: BackgroundTasks)
 
                 if missing_info:
                     formatted_response = ChatResponse(
-                        response="I'd be happy to help you find artwork! I need a bit more information to give you the best results.",
+                        response=message.message,
                         images=None,
                         session_id=session_id,
                         requires_input=missing_info,
@@ -1088,7 +1088,7 @@ async def truelens_chat(message: ChatMessage, background_tasks: BackgroundTasks)
                 else:
                     # Fallback conversational response
                     formatted_response = ChatResponse(
-                        response="I understand you're looking for artwork. Could you please provide more details about what you're looking for?",
+                        response="I understand you're looking for artwork. Could you please provide more style you're looking for?",
                         images=None,
                         session_id=session_id,
                         processing_time=processing_time,
