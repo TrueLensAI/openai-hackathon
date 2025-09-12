@@ -1,4 +1,4 @@
-# backend/main.py - Complete Backend for TrueLensAI Integration
+# baorskend/main.py - Complete Backend for TrueLensAI Integration
 import string
 from fastapi import FastAPI, HTTPException, Depends, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
@@ -50,6 +50,7 @@ class Config:
         "http://localhost:3000",  # Alternative React port
         "http://localhost:4173",  # Vite preview
         "openai-hackathon-eta.vercel.app",  # Production deployment
+        "https://openai-hackathon-yb1r.onrender.com" #Render
         "https://*.vercel.app",  # Vercel deployments
     ]
     
