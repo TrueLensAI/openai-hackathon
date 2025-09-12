@@ -362,7 +362,7 @@ class TrueLensSearchImageTool(BaseTool):
         
         payload = {
             "query": query,
-            "type": "neural",
+            "type": "keyword",
             "useAutoprompt": True,
             "numResults": 15,  # Get more results for better ranking
             "includeDomains": self.supported_marketplaces,
