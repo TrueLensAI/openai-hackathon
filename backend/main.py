@@ -312,7 +312,7 @@ class TrueLensGPTOSS(LLM):
         run_manager: Optional[CallbackManagerForLLMRun] = None,
         **kwargs: Any,
     ) -> str:
-        try:
+    try:
         # Check if an event loop is already running.
         loop = asyncio.get_running_loop()
     except RuntimeError:
