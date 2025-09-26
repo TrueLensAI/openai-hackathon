@@ -312,7 +312,20 @@ class TrueLensGPTOSS(LLM):
         run_manager: Optional[CallbackManagerForLLMRun] = None,
         **kwargs: Any,
     ) -> str:
-        raise NotImplementedError("Use the async `_acall` method instead.")
+        try:
+        # Check if an event loop is already running.
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        # If no loop is running, we can safely use asyncio.run().
+        return asyncio.run(self._acall(prompt, stop, run_manager, **kwargs))
+
+    # If a loop is running, we can't use asyncio.run().
+    # Instead, we create a task and run it to completion in the existing loop.
+    if loop.is_running():
+        return loop.run_until_complete(self._acall(prompt, stop, run_manager, **kwargs))
+    else:
+        # Fallback for a loop that exists but isn't running.
+        return asyncio.run(self._acall(prompt, stop, run_manager, **kwargs))
 
 # =============================================
 # ENHANCED SEARCH IMAGE TOOL - TrueLensAI
