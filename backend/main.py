@@ -49,8 +49,7 @@ class Config:
         "http://localhost:5173",  # Vite dev server
         "http://localhost:3000",  # Alternative React port
         "http://localhost:4173",  # Vite preview
-        "openai-hackathon-eta.vercel.app",  # Production deployment
-        "https://*.vercel.app",  # Vercel deployments
+        "https://openai-hackathon-eta.vercel.app",  # Production deployment
     ]
     
     # API Keys (Placeholder - Replace with actual keys)
