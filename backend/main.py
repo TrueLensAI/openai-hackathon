@@ -272,7 +272,7 @@ class TrueLensGPTOSS(LLM):
         
         async with httpx.AsyncClient(timeout=45.0) as client:
             try:
-                response = await client.POST(
+                response = await client.post(
                     self.endpoint_url,
                     headers=headers,
                     json=payload
