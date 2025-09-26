@@ -313,25 +313,7 @@ class TrueLensGPTOSS(LLM):
         run_manager: Optional[CallbackManagerForLLMRun] = None,
         **kwargs: Any,
     ) -> str:
-        """Synchronous wrapper for async call"""
-        try:
-            return asyncio.run(self._acall(prompt, stop, run_manager, **kwargs))
-        except RuntimeError as e:
-            if "running event loop" in str(e):
-                logger.error(f"Asyncio event loop conflict: {str(e)}")
-                # Return a properly formatted response for LangChain agent parsing
-                return """Thought: I encountered an asyncio event loop conflict which prevents me from processing this request properly.
-
-Final Answer: I'm experiencing a technical issue with the AI service. Please try again in a moment."""
-            else:
-                logger.error(f"Unexpected RuntimeError in LLM call: {str(e)}")
-                raise
-        except Exception as e:
-            logger.error(f"Unexpected error in LLM synchronous call: {str(e)}")
-            # Return a properly formatted error response
-            return """Thought: An unexpected error occurred while processing the request.
-
-Final Answer: I encountered an unexpected error. Please try again."""
+        raise NotImplementedError("Use the async `_acall` method instead.")
 
 # =============================================
 # ENHANCED SEARCH IMAGE TOOL - TrueLensAI
@@ -591,16 +573,7 @@ class TrueLensSearchImageTool(BaseTool):
             ]
     
     def _run(self, query: str) -> str:
-        try:
-            return asyncio.run(self._arun(query))
-        except RuntimeError as e:
-            if "running event loop" in str(e):
-                return json.dumps({
-                    "status": "error",
-                    "message": "Asyncio loop conflict. Please try again."
-                })
-            else:
-                raise
+     raise NotImplementedError("Use the async `_arun` method instead.")
     
     async def _arun(self, query: str) -> str:
         start_time = datetime.now()
@@ -1039,61 +1012,16 @@ async def truelens_chat(message: ChatMessage, background_tasks: BackgroundTasks)
             # Log the incoming message
             logger.info(f"Processing message: {message.message}")
 
-            # Extract requirements from user message for analysis
-            requirements = extract_requirements_ai(message.message)
-            has_all_requirements = all([
-                requirements.get('description'),
-                requirements.get('style')
-            ])
+            # The agent will handle determining if it has enough information.
+            # We call the agent's async method `arun` to correctly use our async tools.
+            agent_response = await agent.arun(message.message)
 
-            # Direct approach: If we have all requirements, execute search directly
-            if has_all_requirements:
-                logger.info("Direct execution: Have all requirements, executing search")
+            # Calculate processing time
+            processing_time = (datetime.now() - start_time).total_seconds()
 
-                # Format optimized query
-                optimized_query = f"{requirements['style']} {requirements['description']}".strip()
-                logger.info(f"Executing search with query: {optimized_query}")
-
-                # Execute the tool directly
-                tool_response = await TrueLensSearchImageTool()._arun(optimized_query)
-
-                # Calculate processing time
-                processing_time = (datetime.now() - start_time).total_seconds()
-
-                # Format for frontend display
-                formatted_response = format_truelens_response(tool_response, processing_time)
-                formatted_response.session_id = session_id
-
-            # If missing requirements, ask for clarification
-            else:
-                logger.info("Missing requirements, asking for clarification")
-
-                processing_time = (datetime.now() - start_time).total_seconds()
-
-                missing_info = {}
-                if not requirements.get('style'):
-                    missing_info["style"] = "What style do you prefer? (realistic, cartoon, abstract, etc.)"
-                if not requirements.get('description'):
-                    missing_info["description"] = "What should the artwork look like?"
-
-                if missing_info:
-                    formatted_response = ChatResponse(
-                        response=message.message,
-                        images=None,
-                        session_id=session_id,
-                        requires_input=missing_info,
-                        processing_time=processing_time,
-                        suggestions=generate_suggestions_for_context(message.message)
-                    )
-                else:
-                    # Fallback conversational response
-                    formatted_response = ChatResponse(
-                        response="I understand you're looking for artwork. Could you please provide more style you're looking for?",
-                        images=None,
-                        session_id=session_id,
-                        processing_time=processing_time,
-                        suggestions=generate_suggestions_for_context(message.message)
-                    )
+            # Format the agent's final response for the frontend
+            formatted_response = format_truelens_response(agent_response, processing_time)
+            formatted_response.session_id = session_id
         
         except asyncio.TimeoutError:
             response = "I'm taking longer than expected to process your request. This might be due to high demand on our AI services. Please try again with a simpler request."
@@ -1234,18 +1162,18 @@ async def internal_error_handler(request, exc):
     return {"error": "Internal server error", "message": "Please try again later"}
 
 # =============================================
-# MAIN APPLICATION ENTRY POINT
+# MAIN APPLICATION ENTRY POINT  - Uncomment for local
 # =============================================
 
-if __name__ == "__main__":
-    import uvicorn
+# if __name__ == "__main__":
+#    import uvicorn
     
-    logger.info("🎨 Starting TrueLensAI Development Server...")
+#    logger.info("🎨 Starting TrueLensAI Development Server...")
     
-    uvicorn.run(
-        "main:app",
-        host=Config.HOST,
-        port=Config.PORT,
-        reload=Config.ENVIRONMENT == "development",
-        log_level="info"
-    )
+#   uvicorn.run(
+#        "main:app",
+#        host=Config.HOST,
+#        port=Config.PORT,
+#        reload=Config.ENVIRONMENT == "development",
+#        log_level="info"
+#    )
