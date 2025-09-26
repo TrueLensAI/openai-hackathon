@@ -3,7 +3,7 @@ import string
 from fastapi import FastAPI, HTTPException, Depends, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse 
 from pydantic import BaseModel, Field, field_validator
 from typing import List, Optional, Dict, Any, Union
 import httpx
@@ -1151,15 +1151,21 @@ async def get_stats():
 # ERROR HANDLERS
 # =============================================
 
+
 @app.exception_handler(404)
 async def not_found_handler(request, exc):
-    return {"error": "Endpoint not found", "message": "Check the API documentation at /api/docs"}
+    return JSONResponse(
+        status_code=404,
+        content={"error": "Endpoint not found", "message": "Check the API documentation at /api/docs"}
+    )
 
-@app.exception_handler(500)
+@app.exception_handler(Exception) # Catching general Exception is often better for a 500 handler
 async def internal_error_handler(request, exc):
-    logger.error(f"Internal server error: {str(exc)}")
-    return {"error": "Internal server error", "message": "Please try again later"}
-
+    logger.error(f"Internal server error: {exc}", exc_info=True) # exc_info=True gives a full traceback
+    return JSONResponse(
+        status_code=500,
+        content={"error": "Internal server error", "message": "An unexpected error occurred. Please try again later."}
+    )
 # =============================================
 # MAIN APPLICATION ENTRY POINT  - Uncomment for local
 # =============================================
